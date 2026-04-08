@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
-from app.db.session import SessionLocal, engine
+from app.db.session import SessionLocal, engine, ensure_sqlite_schema
 from app.models.food_item import FoodItem
 from app.schemas.item import (
     ItemCreate,
@@ -24,6 +24,7 @@ voice_parser = VoiceParser()
 
 
 Base.metadata.create_all(bind=engine)
+ensure_sqlite_schema(engine)
 
 
 def get_db() -> Generator[Session, None, None]:
