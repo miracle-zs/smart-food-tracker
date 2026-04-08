@@ -200,6 +200,11 @@ def update_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     if item.status != "active":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active items can be edited")
+    if not item.needs_confirmation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only pending active items can be edited",
+        )
 
     item.name = payload.name
     item.location = payload.location
@@ -219,6 +224,11 @@ def confirm_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     if item.status != "active":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active items can be confirmed")
+    if not item.needs_confirmation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only pending active items can be confirmed",
+        )
 
     item.needs_confirmation = False
     db.commit()

@@ -1,16 +1,15 @@
 from datetime import date
 
 
-def test_edit_active_item_updates_name_location_and_expiry_date(client):
+def test_edit_pending_active_item_updates_name_location_and_expiry_date(client):
     created_response = client.post(
-        "/api/items",
+        "/api/items/voice",
         json={
-            "name": "鲜牛奶",
-            "location": "冷藏室",
-            "expiry_date": "2026-04-12",
+            "raw_text": "放了一盒沙拉",
         },
     )
-    created_item = created_response.json()
+    created_item = created_response.json()["item"]
+    assert created_item["needs_confirmation"] is True
 
     response = client.put(
         f"/api/items/{created_item['id']}",
@@ -78,3 +77,29 @@ def test_edit_and_confirm_reject_non_active_items(client):
     confirm_response = client.post(f"/api/items/{created_item['id']}/confirm")
     assert confirm_response.status_code == 409
     assert confirm_response.json()["detail"] == "Only active items can be confirmed"
+
+
+def test_edit_and_confirm_reject_active_items_without_confirmation(client):
+    created_item = client.post(
+        "/api/items",
+        json={
+            "name": "鲜牛奶",
+            "location": "冷藏室",
+            "expiry_date": "2026-04-12",
+        },
+    ).json()
+
+    edit_response = client.put(
+        f"/api/items/{created_item['id']}",
+        json={
+            "name": "低脂牛奶",
+            "location": "冰箱门架",
+            "expiry_date": "2026-04-20",
+        },
+    )
+    assert edit_response.status_code == 409
+    assert edit_response.json()["detail"] == "Only pending active items can be edited"
+
+    confirm_response = client.post(f"/api/items/{created_item['id']}/confirm")
+    assert confirm_response.status_code == 409
+    assert confirm_response.json()["detail"] == "Only pending active items can be confirmed"
