@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -11,6 +12,14 @@ class ItemCreate(BaseModel):
 
 class VoiceItemCreate(BaseModel):
     raw_text: str
+
+
+class VoiceWebhookCreate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    text: str | None = None
+    raw_text: str | None = None
+    query: Any = None
 
 
 class ItemResponse(BaseModel):
@@ -42,3 +51,8 @@ class VoiceParseResult(BaseModel):
 class VoiceItemResponse(BaseModel):
     parsed_data: VoiceParseResult
     item: ItemResponse
+
+
+class WebhookIngestionResponse(BaseModel):
+    ok: bool
+    item_id: int

@@ -15,6 +15,8 @@ from app.schemas.item import (
     VoiceItemCreate,
     VoiceItemResponse,
     VoiceParseResult,
+    VoiceWebhookCreate,
+    WebhookIngestionResponse,
 )
 from app.services.voice_parser import VoiceParser
 
@@ -60,6 +62,66 @@ def to_item_response(item: FoodItem) -> ItemResponse:
     )
 
 
+def _normalize_webhook_text(value: object) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, dict):
+        for key in ("text", "raw_text", "query", "content", "message"):
+            normalized = _normalize_webhook_text(value.get(key))
+            if normalized:
+                return normalized
+        return None
+    if isinstance(value, list):
+        for entry in value:
+            normalized = _normalize_webhook_text(entry)
+            if normalized:
+                return normalized
+    return None
+
+
+def _extract_webhook_text(payload: VoiceWebhookCreate) -> str:
+    for candidate in (payload.text, payload.raw_text, payload.query):
+        normalized = _normalize_webhook_text(candidate)
+        if normalized:
+            return normalized
+
+    extra = getattr(payload, "model_extra", None) or {}
+    for key in ("text", "raw_text", "query"):
+        if key in extra:
+            normalized = _normalize_webhook_text(extra[key])
+            if normalized:
+                return normalized
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Webhook payload must include text content",
+    )
+
+
+def _persist_voice_item(raw_text: str, db: Session) -> VoiceItemResponse:
+    parsed = voice_parser.parse(raw_text)
+    item = FoodItem(
+        name=parsed.name,
+        location=parsed.location,
+        expiry_date=parsed.expiry_date,
+        status="active",
+        needs_confirmation=parsed.needs_confirmation,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return VoiceItemResponse(
+        parsed_data=VoiceParseResult(
+            name=parsed.name,
+            location=parsed.location,
+            expiry_date=parsed.expiry_date,
+            needs_confirmation=parsed.needs_confirmation,
+        ),
+        item=to_item_response(item),
+    )
+
+
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)) -> ItemResponse:
     item = FoodItem(
@@ -94,26 +156,16 @@ def create_item_from_voice(
     payload: VoiceItemCreate,
     db: Session = Depends(get_db),
 ) -> VoiceItemResponse:
-    parsed = voice_parser.parse(payload.raw_text)
-    item = FoodItem(
-        name=parsed.name,
-        location=parsed.location,
-        expiry_date=parsed.expiry_date,
-        status="active",
-        needs_confirmation=parsed.needs_confirmation,
-    )
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-    return VoiceItemResponse(
-        parsed_data=VoiceParseResult(
-            name=parsed.name,
-            location=parsed.location,
-            expiry_date=parsed.expiry_date,
-            needs_confirmation=parsed.needs_confirmation,
-        ),
-        item=to_item_response(item),
-    )
+    return _persist_voice_item(payload.raw_text, db)
+
+
+@router.post("/voice/webhook", response_model=WebhookIngestionResponse, status_code=status.HTTP_201_CREATED)
+def create_item_from_voice_webhook(
+    payload: VoiceWebhookCreate,
+    db: Session = Depends(get_db),
+) -> WebhookIngestionResponse:
+    result = _persist_voice_item(_extract_webhook_text(payload), db)
+    return WebhookIngestionResponse(ok=True, item_id=result.item.id)
 
 
 @router.put("/{item_id}/status", response_model=ItemResponse)
