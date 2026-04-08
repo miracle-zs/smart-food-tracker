@@ -1,5 +1,7 @@
 from datetime import date, datetime, timezone
 
+import httpx
+
 from app.models.food_item import FoodItem
 from app.services.notifier import Notifier
 
@@ -29,7 +31,7 @@ def test_notifier_posts_to_webhook_when_configured(monkeypatch):
 
     monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
 
-    notifier.send(item=item, stage="30d", days_left=30)
+    assert notifier.send(item=item, stage="30d", days_left=30) is True
 
     assert captured["url"] == "https://example.com/webhook"
     assert "鸡柳" in captured["json"]["title"]
@@ -56,9 +58,9 @@ def test_notifier_posts_pushplus_payload(monkeypatch):
 
     monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
 
-    notifier.send(item=item, stage="7d", days_left=7)
+    assert notifier.send(item=item, stage="7d", days_left=7) is True
 
-    assert captured["url"] == "http://www.pushplus.plus/send"
+    assert captured["url"] == "https://www.pushplus.plus/send"
     assert captured["kwargs"]["json"] == {
         "token": "pushplus-token",
         "title": "SmartFood Tracker 提醒：牛奶",
@@ -90,7 +92,7 @@ def test_notifier_posts_serverchan_payload(monkeypatch):
 
     monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
 
-    notifier.send(item=item, stage="3d", days_left=3)
+    assert notifier.send(item=item, stage="3d", days_left=3) is True
 
     assert captured["url"] == "https://sctapi.ftqq.com/SCT-token.send"
     assert captured["kwargs"]["data"] == {
@@ -100,3 +102,41 @@ def test_notifier_posts_serverchan_payload(monkeypatch):
             "过期日期：2026-04-11"
         ),
     }
+
+
+def test_notifier_returns_false_when_pushplus_token_is_missing():
+    notifier = Notifier(provider="pushplus")
+    item = FoodItem(
+        id=4,
+        name="面包",
+        location="餐桌",
+        entry_date=datetime(2026, 4, 8, tzinfo=timezone.utc),
+        expiry_date=date(2026, 4, 10),
+        status="active",
+        needs_confirmation=False,
+    )
+
+    assert notifier.send(item=item, stage="3d", days_left=2) is False
+
+
+def test_notifier_returns_false_when_webhook_request_fails(monkeypatch):
+    notifier = Notifier(provider="generic", webhook_url="https://example.com/webhook")
+    item = FoodItem(
+        id=5,
+        name="豆腐",
+        location="冷藏室",
+        entry_date=datetime(2026, 4, 8, tzinfo=timezone.utc),
+        expiry_date=date(2026, 4, 12),
+        status="active",
+        needs_confirmation=False,
+    )
+
+    request = httpx.Request("POST", "https://example.com/webhook")
+    response = httpx.Response(500, request=request)
+
+    def fake_post(url, json, timeout):
+        return response
+
+    monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
+
+    assert notifier.send(item=item, stage="7d", days_left=4) is False

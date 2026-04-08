@@ -29,9 +29,9 @@ class ReminderService:
             if stage is None or item.last_notified_stage == stage:
                 continue
 
-            self.notifier.send(item=item, stage=stage, days_left=days_left)
-            item.last_notified_stage = stage
-            sent_count += 1
+            if self.notifier.send(item=item, stage=stage, days_left=days_left):
+                item.last_notified_stage = stage
+                sent_count += 1
 
         db.commit()
         return sent_count

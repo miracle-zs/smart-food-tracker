@@ -7,7 +7,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-PUSHPLUS_ENDPOINT = "http://www.pushplus.plus/send"
+PUSHPLUS_ENDPOINT = "https://www.pushplus.plus/send"
 SERVERCHAN_ENDPOINT = "https://sctapi.ftqq.com/{sendkey}.send"
 
 
@@ -24,63 +24,75 @@ class Notifier:
         self.pushplus_token = pushplus_token if pushplus_token is not None else settings.notification_pushplus_token
         self.serverchan_key = serverchan_key if serverchan_key is not None else settings.notification_serverchan_key
 
-    def send(self, *, item, stage: str, days_left: int) -> None:
+    def send(self, *, item, stage: str, days_left: int) -> bool:
         message = self._build_message(item=item, stage=stage, days_left=days_left)
 
         if self.provider == "pushplus":
             if not self.pushplus_token:
                 logger.info("Push Plus notification skipped because token is missing")
-                return
-            response = httpx.post(
-                PUSHPLUS_ENDPOINT,
-                json={
-                    "token": self.pushplus_token,
-                    "title": f"SmartFood Tracker 提醒：{item.name}",
-                    "content": (
-                        f"<p>{message}</p>"
-                        f"<p>过期日期：{item.expiry_date.isoformat()}</p>"
-                    ),
-                    "template": "html",
-                },
-                timeout=10,
-            )
-            response.raise_for_status()
-            return
+                return False
+            try:
+                response = httpx.post(
+                    PUSHPLUS_ENDPOINT,
+                    json={
+                        "token": self.pushplus_token,
+                        "title": f"SmartFood Tracker 提醒：{item.name}",
+                        "content": (
+                            f"<p>{message}</p>"
+                            f"<p>过期日期：{item.expiry_date.isoformat()}</p>"
+                        ),
+                        "template": "html",
+                    },
+                    timeout=10,
+                )
+                response.raise_for_status()
+            except httpx.HTTPError:
+                logger.exception("Push Plus notification failed")
+                return False
+            return True
 
         if self.provider == "serverchan":
             if not self.serverchan_key:
                 logger.info("Server酱 notification skipped because sendkey is missing")
-                return
-            response = httpx.post(
-                SERVERCHAN_ENDPOINT.format(sendkey=self.serverchan_key),
-                data={
-                    "title": f"SmartFood Tracker 提醒：{item.name}",
-                    "desp": (
-                        f"{message}\n\n"
-                        f"过期日期：{item.expiry_date.isoformat()}"
-                    ),
-                },
-                timeout=10,
-            )
-            response.raise_for_status()
-            return
+                return False
+            try:
+                response = httpx.post(
+                    SERVERCHAN_ENDPOINT.format(sendkey=self.serverchan_key),
+                    data={
+                        "title": f"SmartFood Tracker 提醒：{item.name}",
+                        "desp": (
+                            f"{message}\n\n"
+                            f"过期日期：{item.expiry_date.isoformat()}"
+                        ),
+                    },
+                    timeout=10,
+                )
+                response.raise_for_status()
+            except httpx.HTTPError:
+                logger.exception("Server酱 notification failed")
+                return False
+            return True
 
         if self.webhook_url:
-            response = httpx.post(
-                self.webhook_url,
-                json={
-                    "title": f"SmartFood Tracker 提醒：{item.name}",
-                    "message": message,
-                    "item_name": item.name,
-                    "location": item.location,
-                    "expiry_date": item.expiry_date.isoformat(),
-                    "days_left": days_left,
-                    "stage": stage,
-                },
-                timeout=10,
-            )
-            response.raise_for_status()
-            return
+            try:
+                response = httpx.post(
+                    self.webhook_url,
+                    json={
+                        "title": f"SmartFood Tracker 提醒：{item.name}",
+                        "message": message,
+                        "item_name": item.name,
+                        "location": item.location,
+                        "expiry_date": item.expiry_date.isoformat(),
+                        "days_left": days_left,
+                        "stage": stage,
+                    },
+                    timeout=10,
+                )
+                response.raise_for_status()
+            except httpx.HTTPError:
+                logger.exception("Reminder webhook failed")
+                return False
+            return True
 
         logger.info(
             "Reminder sent",
@@ -91,6 +103,7 @@ class Notifier:
                 "days_left": days_left,
             },
         )
+        return False
 
     def _build_message(self, *, item, stage: str, days_left: int) -> str:
         return (
