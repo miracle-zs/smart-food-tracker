@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartFood Tracker</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Kitchen Intelligence</p>
+          <h1>SmartFood Tracker</h1>
+          <p class="summary">
+            用一块家庭屏，把冷冻室、冷藏室和零食柜的效期风险集中管理。
+          </p>
+        </div>
+        <div class="hero-metrics">
+          <article class="metric-card">
+            <span class="metric-label">下一次提醒</span>
+            <strong>每日 10:00</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">提醒节点</span>
+            <strong>30 / 7 / 3 天</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="control-grid">
+        <article class="panel">
+          <div class="panel-heading">
+            <p class="panel-kicker">Manual Entry</p>
+            <h2>手动录入</h2>
+          </div>
+          <form id="manual-entry-form" class="entry-form">
+            <label>
+              <span>食材名称</span>
+              <input name="name" type="text" placeholder="例如：鲜牛奶" required />
+            </label>
+            <label>
+              <span>存放位置</span>
+              <input name="location" type="text" placeholder="例如：冷藏室" required />
+            </label>
+            <label>
+              <span>过期日期</span>
+              <input name="expiry_date" type="date" required />
+            </label>
+            <button type="submit">添加到看板</button>
+          </form>
+        </article>
+
+        <article class="panel panel-voice">
+          <div class="panel-heading">
+            <p class="panel-kicker">Voice Inbox</p>
+            <h2>语音文本录入</h2>
+          </div>
+          <form id="voice-entry-form" class="entry-form">
+            <label>
+              <span>小爱转写文本</span>
+              <textarea
+                name="raw_text"
+                rows="5"
+                placeholder="例如：今天放了一袋鸡柳在冷冻室，今年10月底过期"
+                required
+              ></textarea>
+            </label>
+            <button type="submit">解析并入库</button>
+          </form>
+          <p class="note">
+            未识别出明确时间时，系统会默认 +30 天，并标记为“待确认”。
+          </p>
+        </article>
+      </section>
+
+      <section class="board-shell">
+        <div class="board-header">
+          <div>
+            <p class="panel-kicker">Expiry Board</p>
+            <h2>全局效期看板</h2>
+          </div>
+          <div class="filters">
+            <label>
+              <span>状态</span>
+              <select id="status-filter">
+                <option value="active">进行中</option>
+                <option value="">全部</option>
+                <option value="consumed">已吃完</option>
+                <option value="discarded">已丢弃</option>
+              </select>
+            </label>
+            <label>
+              <span>位置</span>
+              <select id="location-filter">
+                <option value="">全部位置</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+
+        <div id="items-board" class="items-board"></div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+"""SmartFood Tracker application package."""
