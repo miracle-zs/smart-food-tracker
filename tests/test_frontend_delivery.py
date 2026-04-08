@@ -6,4 +6,6 @@ def test_dashboard_shell_serves_forms_and_item_board(client):
     assert "manual-entry-form" in response.text
     assert "voice-entry-form" in response.text
     assert "items-board" in response.text
+    assert "edit-confirm-panel" in response.text
+    assert "confirm-pending-item" in response.text
     assert "/static/app.js" in response.text

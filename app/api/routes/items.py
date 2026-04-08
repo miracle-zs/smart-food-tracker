@@ -12,6 +12,7 @@ from app.schemas.item import (
     ItemCreate,
     ItemResponse,
     ItemStatusUpdate,
+    ItemUpdate,
     VoiceItemCreate,
     VoiceItemResponse,
     VoiceParseResult,
@@ -183,6 +184,43 @@ def update_item_status(
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     item.status = payload.status
+    db.commit()
+    db.refresh(item)
+    return to_item_response(item)
+
+
+@router.put("/{item_id}", response_model=ItemResponse)
+def update_item(
+    item_id: int,
+    payload: ItemUpdate,
+    db: Session = Depends(get_db),
+) -> FoodItem:
+    item = db.get(FoodItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    if item.status != "active":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active items can be edited")
+
+    item.name = payload.name
+    item.location = payload.location
+    item.expiry_date = payload.expiry_date
+    db.commit()
+    db.refresh(item)
+    return to_item_response(item)
+
+
+@router.post("/{item_id}/confirm", response_model=ItemResponse)
+def confirm_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+) -> FoodItem:
+    item = db.get(FoodItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    if item.status != "active":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active items can be confirmed")
+
+    item.needs_confirmation = False
     db.commit()
     db.refresh(item)
     return to_item_response(item)

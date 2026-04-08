@@ -10,6 +10,10 @@ class ItemCreate(BaseModel):
     expiry_date: date
 
 
+class ItemUpdate(ItemCreate):
+    pass
+
+
 class VoiceItemCreate(BaseModel):
     raw_text: str
 
