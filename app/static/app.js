@@ -10,6 +10,7 @@ const pendingItemIdField = pendingItemForm.querySelector('input[name="item_id"]'
 const pendingItemNameField = document.querySelector("#pending-item-name");
 const pendingItemLocationField = document.querySelector("#pending-item-location");
 const pendingItemExpiryField = document.querySelector("#pending-item-expiry-date");
+const pendingItemSaveButton = pendingItemForm.querySelector('button[type="submit"]');
 const selectedItemSummary = document.querySelector("#selected-item-summary");
 const confirmPendingButton = document.querySelector("#confirm-pending-item");
 
@@ -145,7 +146,7 @@ function openReviewPanel(item) {
   pendingItemNameField.disabled = false;
   pendingItemLocationField.disabled = false;
   pendingItemExpiryField.disabled = false;
-  pendingItemForm.querySelector('button[type="submit"]').disabled = false;
+  pendingItemSaveButton.disabled = false;
   pendingItemNameField.value = item.name;
   pendingItemLocationField.value = item.location;
   pendingItemExpiryField.value = item.expiry_date;
@@ -154,10 +155,23 @@ function openReviewPanel(item) {
   reviewPanel.classList.add("is-active");
 }
 
+function resetReviewPanel() {
+  pendingItemForm.reset();
+  pendingItemIdField.value = "";
+  pendingItemNameField.disabled = true;
+  pendingItemLocationField.disabled = true;
+  pendingItemExpiryField.disabled = true;
+  pendingItemSaveButton.disabled = true;
+  confirmPendingButton.disabled = true;
+  selectedItemSummary.textContent = "选择一个待确认条目后，可以在这里修正名称、位置和过期日期。";
+  reviewPanel.classList.remove("is-active");
+}
+
 async function confirmItem(itemId) {
   await requestJson(`/api/items/${itemId}/confirm`, {
     method: "POST",
   });
+  resetReviewPanel();
   setFeedback("待确认标记已清除");
   await loadItems();
 }
@@ -179,6 +193,7 @@ async function handlePendingItemSubmit(event) {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+    resetReviewPanel();
     setFeedback("条目已更新");
     await loadItems();
   } catch (error) {
