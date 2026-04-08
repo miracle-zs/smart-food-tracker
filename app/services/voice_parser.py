@@ -82,57 +82,67 @@ class VoiceParser:
         return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
     def _extract_fallback_date(self, raw_text: str) -> date | None:
-        relative_date = self._extract_relative_date(raw_text)
-        if relative_date is not None:
-            return relative_date
+        search_text = self._extract_expiry_search_text(raw_text)
+        candidates: list[tuple[int, date]] = []
+        candidates.extend(self._extract_relative_date_candidates(search_text))
+        candidates.extend(self._extract_current_year_month_end_candidates(search_text))
+        candidates.extend(self._extract_current_year_month_day_candidates(search_text))
 
-        month_end_date = self._extract_current_year_month_end_date(raw_text)
-        if month_end_date is not None:
-            return month_end_date
+        if not candidates:
+            return None
 
-        month_day_date = self._extract_current_year_month_day_date(raw_text)
-        if month_day_date is not None:
-            return month_day_date
+        return max(candidates, key=lambda candidate: candidate[0])[1]
 
-        return None
+    def _extract_expiry_search_text(self, raw_text: str) -> str:
+        cutoff = max(raw_text.rfind(keyword) for keyword in ("过期", "到期", "截止"))
+        if cutoff == -1:
+            return raw_text
+        return raw_text[:cutoff]
 
-    def _extract_relative_date(self, raw_text: str) -> date | None:
+    def _extract_relative_date_candidates(self, raw_text: str) -> list[tuple[int, date]]:
+        candidates: list[tuple[int, date]] = []
         relative_offsets = {
             "今天": 0,
             "明天": 1,
             "后天": 2,
         }
+
         for keyword, offset in relative_offsets.items():
-            if keyword in raw_text:
-                return date.today() + timedelta(days=offset)
+            for match in re.finditer(keyword, raw_text):
+                candidates.append((match.start(), date.today() + timedelta(days=offset)))
 
-        match = re.search(r"(\d+)天后", raw_text)
-        if match:
-            return date.today() + timedelta(days=int(match.group(1)))
+        for match in re.finditer(r"(\d+)天后", raw_text):
+            candidates.append((match.start(), date.today() + timedelta(days=int(match.group(1)))))
 
-        return None
+        return candidates
 
-    def _extract_current_year_month_end_date(self, raw_text: str) -> date | None:
-        match = re.search(r"(?:今年)?(\d{1,2})月底", raw_text)
-        if not match:
-            return None
-
-        month = int(match.group(1))
-        last_day = calendar.monthrange(date.today().year, month)[1]
-        return date(date.today().year, month, last_day)
-
-    def _extract_current_year_month_day_date(self, raw_text: str) -> date | None:
-        match = re.search(r"(?:今年)?(\d{1,2})月(\d{1,2})[日号]?", raw_text)
-        if not match:
-            return None
-
+    def _extract_current_year_month_end_candidates(self, raw_text: str) -> list[tuple[int, date]]:
+        candidates: list[tuple[int, date]] = []
         year = date.today().year
-        month = int(match.group(1))
-        day = int(match.group(2))
-        try:
-            return date(year, month, day)
-        except ValueError:
-            return None
+
+        for match in re.finditer(r"(?:今年)?(\d{1,2})月底", raw_text):
+            month = int(match.group(1))
+            try:
+                last_day = calendar.monthrange(year, month)[1]
+                candidates.append((match.start(), date(year, month, last_day)))
+            except (calendar.IllegalMonthError, ValueError):
+                continue
+
+        return candidates
+
+    def _extract_current_year_month_day_candidates(self, raw_text: str) -> list[tuple[int, date]]:
+        candidates: list[tuple[int, date]] = []
+        year = date.today().year
+
+        for match in re.finditer(r"(?:今年)?(\d{1,2})月(\d{1,2})[日号]?", raw_text):
+            month = int(match.group(1))
+            day = int(match.group(2))
+            try:
+                candidates.append((match.start(), date(year, month, day)))
+            except ValueError:
+                continue
+
+        return candidates
 
     def _extract_location(self, raw_text: str) -> str:
         for keyword in LOCATION_KEYWORDS:

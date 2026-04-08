@@ -64,3 +64,30 @@ def test_voice_parser_falls_back_for_relative_and_local_dates():
 
         assert parsed.expiry_date == expected_date
         assert parsed.needs_confirmation is False
+
+
+def test_voice_parser_prefers_expiry_phrase_over_context_words():
+    parser = VoiceParser(api_key="", base_url="", model="")
+
+    cases = [
+        ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(2026, 10, 31)),
+        ("今天买的牛奶明天过期", date.today() + timedelta(days=1)),
+    ]
+
+    for raw_text, expected_date in cases:
+        parsed = parser.parse(raw_text)
+
+        assert parsed.expiry_date == expected_date
+        assert parsed.needs_confirmation is False
+
+
+def test_voice_parser_invalid_month_falls_back_safely():
+    parser = VoiceParser(api_key="", base_url="", model="")
+
+    cases = ["13月底过期", "13月31日过期"]
+
+    for raw_text in cases:
+        parsed = parser.parse(raw_text)
+
+        assert parsed.expiry_date == date.today() + timedelta(days=30)
+        assert parsed.needs_confirmation is True

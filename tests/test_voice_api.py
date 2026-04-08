@@ -49,3 +49,29 @@ def test_voice_ingestion_parses_relative_and_local_dates(client, raw_text, expec
     payload = response.json()
     assert payload["item"]["expiry_date"] == expected_date
     assert payload["item"]["needs_confirmation"] is expected_needs_confirmation
+
+
+@pytest.mark.parametrize(
+    ("raw_text", "expected_date", "expected_needs_confirmation"),
+    [
+        ("今天放了一袋鸡柳在冷冻室，10月31日过期", "2026-10-31", False),
+        ("今天买的牛奶明天过期", (date.today() + timedelta(days=1)).isoformat(), False),
+        ("13月底过期", (date.today() + timedelta(days=30)).isoformat(), True),
+        ("13月31日过期", (date.today() + timedelta(days=30)).isoformat(), True),
+    ],
+)
+def test_voice_ingestion_scopes_relative_dates_and_handles_invalid_months(
+    client,
+    raw_text,
+    expected_date,
+    expected_needs_confirmation,
+):
+    response = client.post(
+        "/api/items/voice",
+        json={"raw_text": raw_text},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["item"]["expiry_date"] == expected_date
+    assert payload["item"]["needs_confirmation"] is expected_needs_confirmation
