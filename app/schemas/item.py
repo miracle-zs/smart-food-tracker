@@ -17,9 +17,11 @@ class VoiceItemCreate(BaseModel):
 class VoiceWebhookCreate(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    text: str | None = None
-    raw_text: str | None = None
+    text: Any = None
+    raw_text: Any = None
     query: Any = None
+    content: Any = None
+    message: Any = None
 
 
 class ItemResponse(BaseModel):

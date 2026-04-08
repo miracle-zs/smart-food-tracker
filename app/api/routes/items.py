@@ -74,6 +74,11 @@ def _normalize_webhook_text(value: object) -> str | None:
         return None
     if isinstance(value, list):
         for entry in value:
+            if isinstance(entry, (dict, list)):
+                normalized = _normalize_webhook_text(entry)
+                if normalized:
+                    return normalized
+        for entry in value:
             normalized = _normalize_webhook_text(entry)
             if normalized:
                 return normalized
@@ -81,13 +86,13 @@ def _normalize_webhook_text(value: object) -> str | None:
 
 
 def _extract_webhook_text(payload: VoiceWebhookCreate) -> str:
-    for candidate in (payload.text, payload.raw_text, payload.query):
-        normalized = _normalize_webhook_text(candidate)
+    for key in ("text", "raw_text", "query", "content", "message"):
+        normalized = _normalize_webhook_text(getattr(payload, key, None))
         if normalized:
             return normalized
 
     extra = getattr(payload, "model_extra", None) or {}
-    for key in ("text", "raw_text", "query"):
+    for key in ("text", "raw_text", "query", "content", "message"):
         if key in extra:
             normalized = _normalize_webhook_text(extra[key])
             if normalized:
