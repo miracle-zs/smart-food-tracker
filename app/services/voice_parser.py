@@ -54,19 +54,24 @@ class VoiceParser:
         if llm_parsed is not None:
             return llm_parsed
 
-        explicit_date = self._extract_explicit_date(raw_text)
-        if explicit_date is None:
-            explicit_date = self._extract_fallback_date(raw_text)
+        search_text = self._extract_expiry_search_text(raw_text)
         location = self._extract_location(raw_text)
         name = self._extract_name(raw_text)
 
-        if explicit_date:
-            return ParsedVoiceItem(
-                name=name,
-                location=location,
-                expiry_date=explicit_date,
-                needs_confirmation=False,
-            )
+        if search_text is not None:
+            candidates = self._extract_explicit_date_candidates(search_text)
+            candidates.extend(self._extract_relative_date_candidates(search_text))
+            candidates.extend(self._extract_current_year_month_end_candidates(search_text))
+            candidates.extend(self._extract_current_year_month_day_candidates(search_text))
+
+            if candidates:
+                expiry_date = max(candidates, key=lambda candidate: candidate[0])[1]
+                return ParsedVoiceItem(
+                    name=name,
+                    location=location,
+                    expiry_date=expiry_date,
+                    needs_confirmation=False,
+                )
 
         return ParsedVoiceItem(
             name=name,
@@ -75,28 +80,17 @@ class VoiceParser:
             needs_confirmation=True,
         )
 
-    def _extract_explicit_date(self, raw_text: str) -> date | None:
+    def _extract_explicit_date_candidates(self, raw_text: str | None) -> list[tuple[int, date]]:
+        if raw_text is None:
+            return []
+
         match = re.search(r"(\d{4})-(\d{2})-(\d{2})", raw_text)
         if not match:
-            return None
+            return []
         try:
-            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            return [(match.start(), date(int(match.group(1)), int(match.group(2)), int(match.group(3))))]
         except ValueError:
-            return None
-
-    def _extract_fallback_date(self, raw_text: str) -> date | None:
-        search_text = self._extract_expiry_search_text(raw_text)
-        if search_text is None:
-            return None
-        candidates: list[tuple[int, date]] = []
-        candidates.extend(self._extract_relative_date_candidates(search_text))
-        candidates.extend(self._extract_current_year_month_end_candidates(search_text))
-        candidates.extend(self._extract_current_year_month_day_candidates(search_text))
-
-        if not candidates:
-            return None
-
-        return max(candidates, key=lambda candidate: candidate[0])[1]
+            return []
 
     def _extract_expiry_search_text(self, raw_text: str) -> str | None:
         cutoff = max(raw_text.rfind(keyword) for keyword in ("过期", "到期", "截止"))

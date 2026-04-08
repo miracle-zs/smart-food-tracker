@@ -20,7 +20,12 @@ class ReminderService:
 
     def process_due_reminders(self, db: Session, today: date | None = None) -> int:
         current_date = today or date.today()
-        items = db.scalars(select(FoodItem).where(FoodItem.status == "active")).all()
+        items = db.scalars(
+            select(FoodItem).where(
+                FoodItem.status == "active",
+                FoodItem.needs_confirmation.is_(False),
+            )
+        ).all()
         sent_count = 0
 
         for item in items:

@@ -3,6 +3,9 @@ from datetime import date, timedelta
 from app.services.voice_parser import VoiceParser
 
 
+CURRENT_YEAR = date.today().year
+
+
 class FakeResponse:
     def __init__(self, payload):
         self._payload = payload
@@ -53,8 +56,8 @@ def test_voice_parser_falls_back_for_relative_and_local_dates():
     parser = VoiceParser(api_key="", base_url="", model="")
 
     cases = [
-        ("今年10月底过期", date(2026, 10, 31)),
-        ("10月31日过期", date(2026, 10, 31)),
+        ("今年10月底过期", date(CURRENT_YEAR, 10, 31)),
+        ("10月31日过期", date(CURRENT_YEAR, 10, 31)),
         ("3天后过期", date.today() + timedelta(days=3)),
         ("明天过期", date.today() + timedelta(days=1)),
     ]
@@ -70,7 +73,8 @@ def test_voice_parser_prefers_expiry_phrase_over_context_words():
     parser = VoiceParser(api_key="", base_url="", model="")
 
     cases = [
-        ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(2026, 10, 31)),
+        ("2026-04-01买的牛奶明天过期", date.today() + timedelta(days=1)),
+        ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(CURRENT_YEAR, 10, 31)),
         ("今天买的牛奶明天过期", date.today() + timedelta(days=1)),
     ]
 

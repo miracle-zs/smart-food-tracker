@@ -3,6 +3,9 @@ from datetime import date, timedelta
 import pytest
 
 
+CURRENT_YEAR = date.today().year
+
+
 def test_voice_ingestion_falls_back_to_30_days_and_marks_confirmation(client):
     response = client.post(
         "/api/items/voice",
@@ -45,8 +48,8 @@ def test_voice_ingestion_invalid_explicit_iso_date_falls_back_safely(client):
 @pytest.mark.parametrize(
     ("raw_text", "expected_date", "expected_needs_confirmation"),
     [
-        ("今年10月底过期", "2026-10-31", False),
-        ("10月31日过期", "2026-10-31", False),
+        ("今年10月底过期", date(CURRENT_YEAR, 10, 31).isoformat(), False),
+        ("10月31日过期", date(CURRENT_YEAR, 10, 31).isoformat(), False),
         ("3天后过期", (date.today() + timedelta(days=3)).isoformat(), False),
         ("明天过期", (date.today() + timedelta(days=1)).isoformat(), False),
     ],
@@ -66,7 +69,12 @@ def test_voice_ingestion_parses_relative_and_local_dates(client, raw_text, expec
 @pytest.mark.parametrize(
     ("raw_text", "expected_date", "expected_needs_confirmation"),
     [
-        ("今天放了一袋鸡柳在冷冻室，10月31日过期", "2026-10-31", False),
+        (
+            "2026-04-01买的牛奶明天过期",
+            (date.today() + timedelta(days=1)).isoformat(),
+            False,
+        ),
+        ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(CURRENT_YEAR, 10, 31).isoformat(), False),
         ("今天买的牛奶明天过期", (date.today() + timedelta(days=1)).isoformat(), False),
         ("13月底过期", (date.today() + timedelta(days=30)).isoformat(), True),
         ("13月31日过期", (date.today() + timedelta(days=30)).isoformat(), True),

@@ -148,6 +148,37 @@ def test_reminder_service_does_not_mark_stage_when_notification_credentials_miss
     assert refreshed.last_notified_stage is None
 
 
+def test_reminder_service_skips_pending_items(monkeypatch, db_session):
+    today = date(2026, 4, 8)
+    monkeypatch.setattr(settings, "notification_provider", "generic")
+    monkeypatch.setattr(settings, "notification_webhook_url", "https://example.com/webhook")
+    monkeypatch.setattr(settings, "notification_pushplus_token", None)
+    monkeypatch.setattr(settings, "notification_serverchan_key", None)
+
+    def fake_post(*args, **kwargs):
+        raise AssertionError("httpx.post should not be called for pending items")
+
+    monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
+
+    db_session.add(
+        FoodItem(
+            name="鸡柳",
+            location="冷冻室",
+            entry_date=datetime(2026, 4, 8, tzinfo=timezone.utc),
+            expiry_date=date(2026, 5, 8),
+            status="active",
+            needs_confirmation=True,
+        )
+    )
+    db_session.commit()
+
+    reminders = ReminderService().process_due_reminders(db_session, today=today)
+
+    assert reminders == 0
+    refreshed = db_session.query(FoodItem).order_by(FoodItem.name.asc()).one()
+    assert refreshed.last_notified_stage is None
+
+
 def test_reminder_service_does_not_mark_stage_for_unsupported_provider(monkeypatch, db_session):
     today = date(2026, 4, 8)
     monkeypatch.setattr(settings, "notification_provider", "pushpluss")
