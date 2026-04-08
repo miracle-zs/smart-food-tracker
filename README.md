@@ -34,14 +34,20 @@ export REMINDER_HOUR="10"
 export LLM_API_KEY="your-api-key"
 export LLM_BASE_URL="https://api.openai.com/v1"
 export LLM_MODEL="gpt-4.1-mini"
+export NOTIFICATION_PROVIDER="generic"
 export NOTIFICATION_WEBHOOK_URL="https://example.com/webhook"
+export NOTIFICATION_PUSHPLUS_TOKEN="your-pushplus-token"
+export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 ```
 
 说明：
 
 - 未设置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` 时，语音解析自动回退到本地规则解析
-- 设置 `NOTIFICATION_WEBHOOK_URL` 后，提醒会以 HTTP POST 形式发送到该地址
-- 未设置提醒 Webhook 时，系统仅记录 mock 日志
+- `NOTIFICATION_PROVIDER` 支持 `generic` / `pushplus` / `serverchan`
+- `generic` 模式下使用 `NOTIFICATION_WEBHOOK_URL` 发送原始提醒 Webhook
+- `pushplus` 模式下使用 `NOTIFICATION_PUSHPLUS_TOKEN` 发送 Push Plus 消息
+- `serverchan` 模式下使用 `NOTIFICATION_SERVERCHAN_KEY` 发送 Server酱消息
+- 未配置对应凭据时，系统仅记录 mock 日志
 
 ## 已实现能力
 
@@ -69,16 +75,17 @@ export NOTIFICATION_WEBHOOK_URL="https://example.com/webhook"
 
 ## 通知策略
 
-当前通知器支持两种模式：
+当前通知器支持三种模式：
 
-- 配置 `NOTIFICATION_WEBHOOK_URL` 时发送真实 Webhook
+- `generic`：向 `NOTIFICATION_WEBHOOK_URL` 发送原始 Webhook JSON
+- `pushplus`：向 Push Plus 发送适配后的消息体
+- `serverchan`：向 Server酱发送适配后的消息体
 - 未配置时使用 mock 日志实现
 
 可对接：
 
 - Push Plus
 - Server 酱
-- 企业微信机器人
 
 ## 测试
 

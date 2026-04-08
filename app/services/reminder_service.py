@@ -16,7 +16,7 @@ STAGE_BY_DAYS = {
 
 class ReminderService:
     def __init__(self, notifier: Notifier | None = None):
-        self.notifier = notifier or Notifier()
+        self.notifier = notifier if notifier is not None else Notifier()
 
     def process_due_reminders(self, db: Session, today: date | None = None) -> int:
         current_date = today or date.today()
