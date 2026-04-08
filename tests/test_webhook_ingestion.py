@@ -27,7 +27,7 @@ def test_webhook_ingestion_accepts_common_text_payloads(client, db_session, payl
     item = db_session.query(FoodItem).one()
     assert item.name == "鸡柳"
     assert item.location == "冷冻室"
-    assert item.needs_confirmation is True
+    assert item.needs_confirmation is False
 
 
 def test_webhook_ingestion_rejects_payloads_without_text(client):

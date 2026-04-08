@@ -44,22 +44,44 @@ export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 
 - 未设置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` 时，语音解析自动回退到本地规则解析
 - `NOTIFICATION_PROVIDER` 支持 `generic` / `pushplus` / `serverchan`
-- `generic` 模式下使用 `NOTIFICATION_WEBHOOK_URL` 发送原始提醒 Webhook
+- `generic` 模式下使用 `NOTIFICATION_WEBHOOK_URL` 发送原始提醒 Webhook；如果未配置地址，系统仅记录 mock 日志
 - `pushplus` 模式下使用 `NOTIFICATION_PUSHPLUS_TOKEN` 发送 Push Plus 消息
 - `serverchan` 模式下使用 `NOTIFICATION_SERVERCHAN_KEY` 发送 Server酱消息
-- 未配置对应凭据时，系统仅记录 mock 日志
+
+## 接口
+
+- `POST /api/items/voice`：接收语音转写文本，按本地规则或 LLM 解析后创建食材
+- `POST /api/items/voice/webhook`：接收第三方设备或小爱同学风格的 Webhook 文本载荷
+- `PUT /api/items/{id}`：仅允许编辑 `active` 且 `needs_confirmation=true` 的待确认条目
+- `POST /api/items/{id}/confirm`：确认待确认条目并清除 `needs_confirmation`
+
+Webhook 入口支持的常见文本字段包括：
+
+- `text`
+- `raw_text`
+- `query`
+- `content`
+- `message`
+
+这些字段既可以是直接字符串，也可以嵌套在对象或列表中；接口会提取第一个可用文本并复用语音录入流程。成功时返回：
+
+```json
+{ "ok": true, "item_id": 1 }
+```
 
 ## 已实现能力
 
 - 手动录入食材
 - 语音文本录入
+- Webhook 文本接入
 - 过期时间升序看板
 - 状态流转：`active` / `consumed` / `discarded`
 - 每日提醒调度
 - 30 / 7 / 3 天提醒节点
+- 待确认条目的编辑与确认
 - 语音解析失败时默认加 30 天并标记待确认
 
-## 当前语音解析策略
+## 语音与日期解析
 
 当前支持两层策略：
 
@@ -70,6 +92,10 @@ export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 
 - 识别常见位置词，如“冷冻室”“冷藏室”“零食柜”
 - 识别 `YYYY-MM-DD` 格式日期
+- 识别中文相对日期：`今天`、`明天`、`后天`、`N天后`
+- 识别当前年份的月末表达：`今年10月底`、`10月底`
+- 识别当前年份的月日表达：`今年10月31日`、`10月31日`
+- 当文本中存在明确日期时，不再使用 30 天回退
 - 未识别到明确日期时，默认使用当前日期 + 30 天
 - 默认日期会将条目标记为 `needs_confirmation=true`
 
@@ -80,7 +106,14 @@ export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 - `generic`：向 `NOTIFICATION_WEBHOOK_URL` 发送原始 Webhook JSON
 - `pushplus`：向 Push Plus 发送适配后的消息体
 - `serverchan`：向 Server酱发送适配后的消息体
-- 未配置时使用 mock 日志实现
+
+配置建议：
+
+- `NOTIFICATION_PROVIDER` 默认为 `generic`
+- `generic` 适合自建 Webhook、轻量推送服务或调试环境
+- `pushplus` 需要配置 `NOTIFICATION_PUSHPLUS_TOKEN`
+- `serverchan` 需要配置 `NOTIFICATION_SERVERCHAN_KEY`
+- 若 `generic` 未提供 `NOTIFICATION_WEBHOOK_URL`，通知器会降级为 mock 日志，不会发出网络请求
 
 可对接：
 
