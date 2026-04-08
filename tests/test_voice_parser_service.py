@@ -84,7 +84,7 @@ def test_voice_parser_prefers_expiry_phrase_over_context_words():
 def test_voice_parser_invalid_month_falls_back_safely():
     parser = VoiceParser(api_key="", base_url="", model="")
 
-    cases = ["13月底过期", "13月31日过期"]
+    cases = ["13月底过期", "13月31日过期", "2月31日过期", "11月31日过期"]
 
     for raw_text in cases:
         parsed = parser.parse(raw_text)

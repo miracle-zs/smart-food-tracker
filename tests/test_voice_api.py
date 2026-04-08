@@ -58,6 +58,8 @@ def test_voice_ingestion_parses_relative_and_local_dates(client, raw_text, expec
         ("今天买的牛奶明天过期", (date.today() + timedelta(days=1)).isoformat(), False),
         ("13月底过期", (date.today() + timedelta(days=30)).isoformat(), True),
         ("13月31日过期", (date.today() + timedelta(days=30)).isoformat(), True),
+        ("2月31日过期", (date.today() + timedelta(days=30)).isoformat(), True),
+        ("11月31日过期", (date.today() + timedelta(days=30)).isoformat(), True),
     ],
 )
 def test_voice_ingestion_scopes_relative_dates_and_handles_invalid_months(
