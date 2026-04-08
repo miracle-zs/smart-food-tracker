@@ -140,3 +140,23 @@ def test_notifier_returns_false_when_webhook_request_fails(monkeypatch):
     monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
 
     assert notifier.send(item=item, stage="7d", days_left=4) is False
+
+
+def test_notifier_returns_true_when_generic_webhook_is_missing(monkeypatch):
+    notifier = Notifier(provider="generic")
+    item = FoodItem(
+        id=6,
+        name="苹果",
+        location="果盘",
+        entry_date=datetime(2026, 4, 8, tzinfo=timezone.utc),
+        expiry_date=date(2026, 4, 20),
+        status="active",
+        needs_confirmation=False,
+    )
+
+    def fake_post(*args, **kwargs):
+        raise AssertionError("httpx.post should not be called for mock delivery")
+
+    monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
+
+    assert notifier.send(item=item, stage="7d", days_left=12) is True

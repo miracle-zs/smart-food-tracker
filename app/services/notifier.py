@@ -103,7 +103,7 @@ class Notifier:
                 "days_left": days_left,
             },
         )
-        return False
+        return True
 
     def _build_message(self, *, item, stage: str, days_left: int) -> str:
         return (
