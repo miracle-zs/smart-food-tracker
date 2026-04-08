@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -44,7 +44,7 @@ class ItemResponse(BaseModel):
 
 
 class ItemStatusUpdate(BaseModel):
-    status: str
+    status: Literal["consumed", "discarded"]
 
 
 class VoiceParseResult(BaseModel):
