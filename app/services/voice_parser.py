@@ -1,3 +1,4 @@
+import calendar
 import json
 import logging
 import re
@@ -54,6 +55,8 @@ class VoiceParser:
             return llm_parsed
 
         explicit_date = self._extract_explicit_date(raw_text)
+        if explicit_date is None:
+            explicit_date = self._extract_fallback_date(raw_text)
         location = self._extract_location(raw_text)
         name = self._extract_name(raw_text)
 
@@ -77,6 +80,59 @@ class VoiceParser:
         if not match:
             return None
         return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+    def _extract_fallback_date(self, raw_text: str) -> date | None:
+        relative_date = self._extract_relative_date(raw_text)
+        if relative_date is not None:
+            return relative_date
+
+        month_end_date = self._extract_current_year_month_end_date(raw_text)
+        if month_end_date is not None:
+            return month_end_date
+
+        month_day_date = self._extract_current_year_month_day_date(raw_text)
+        if month_day_date is not None:
+            return month_day_date
+
+        return None
+
+    def _extract_relative_date(self, raw_text: str) -> date | None:
+        relative_offsets = {
+            "今天": 0,
+            "明天": 1,
+            "后天": 2,
+        }
+        for keyword, offset in relative_offsets.items():
+            if keyword in raw_text:
+                return date.today() + timedelta(days=offset)
+
+        match = re.search(r"(\d+)天后", raw_text)
+        if match:
+            return date.today() + timedelta(days=int(match.group(1)))
+
+        return None
+
+    def _extract_current_year_month_end_date(self, raw_text: str) -> date | None:
+        match = re.search(r"(?:今年)?(\d{1,2})月底", raw_text)
+        if not match:
+            return None
+
+        month = int(match.group(1))
+        last_day = calendar.monthrange(date.today().year, month)[1]
+        return date(date.today().year, month, last_day)
+
+    def _extract_current_year_month_day_date(self, raw_text: str) -> date | None:
+        match = re.search(r"(?:今年)?(\d{1,2})月(\d{1,2})[日号]?", raw_text)
+        if not match:
+            return None
+
+        year = date.today().year
+        month = int(match.group(1))
+        day = int(match.group(2))
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
 
     def _extract_location(self, raw_text: str) -> str:
         for keyword in LOCATION_KEYWORDS:

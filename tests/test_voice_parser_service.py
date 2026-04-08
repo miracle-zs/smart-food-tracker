@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from app.services.voice_parser import VoiceParser
 
@@ -47,3 +47,20 @@ def test_voice_parser_uses_llm_when_configured(monkeypatch):
     assert parsed.location == "冷冻室"
     assert parsed.expiry_date == date(2026, 10, 31)
     assert parsed.needs_confirmation is False
+
+
+def test_voice_parser_falls_back_for_relative_and_local_dates():
+    parser = VoiceParser(api_key="", base_url="", model="")
+
+    cases = [
+        ("今年10月底过期", date(2026, 10, 31)),
+        ("10月31日过期", date(2026, 10, 31)),
+        ("3天后过期", date.today() + timedelta(days=3)),
+        ("明天过期", date.today() + timedelta(days=1)),
+    ]
+
+    for raw_text, expected_date in cases:
+        parsed = parser.parse(raw_text)
+
+        assert parsed.expiry_date == expected_date
+        assert parsed.needs_confirmation is False

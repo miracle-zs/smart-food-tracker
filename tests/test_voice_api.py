@@ -1,10 +1,12 @@
 from datetime import date, timedelta
 
+import pytest
+
 
 def test_voice_ingestion_falls_back_to_30_days_and_marks_confirmation(client):
     response = client.post(
         "/api/items/voice",
-        json={"raw_text": "今天放了一袋鸡柳在冷冻室"},
+        json={"raw_text": "放了一袋鸡柳在冷冻室"},
     )
 
     assert response.status_code == 201
@@ -26,3 +28,24 @@ def test_voice_ingestion_keeps_explicit_date_and_location(client):
     assert payload["item"]["location"] == "冷冻室"
     assert payload["item"]["expiry_date"] == "2026-10-31"
     assert payload["item"]["needs_confirmation"] is False
+
+
+@pytest.mark.parametrize(
+    ("raw_text", "expected_date", "expected_needs_confirmation"),
+    [
+        ("今年10月底过期", "2026-10-31", False),
+        ("10月31日过期", "2026-10-31", False),
+        ("3天后过期", (date.today() + timedelta(days=3)).isoformat(), False),
+        ("明天过期", (date.today() + timedelta(days=1)).isoformat(), False),
+    ],
+)
+def test_voice_ingestion_parses_relative_and_local_dates(client, raw_text, expected_date, expected_needs_confirmation):
+    response = client.post(
+        "/api/items/voice",
+        json={"raw_text": raw_text},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["item"]["expiry_date"] == expected_date
+    assert payload["item"]["needs_confirmation"] is expected_needs_confirmation
