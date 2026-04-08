@@ -119,6 +119,26 @@ def test_notifier_returns_false_when_pushplus_token_is_missing():
     assert notifier.send(item=item, stage="3d", days_left=2) is False
 
 
+def test_notifier_returns_false_for_unsupported_provider(monkeypatch):
+    notifier = Notifier(provider="pushpluss", webhook_url="https://example.com/webhook")
+    item = FoodItem(
+        id=7,
+        name="梨",
+        location="果盘",
+        entry_date=datetime(2026, 4, 8, tzinfo=timezone.utc),
+        expiry_date=date(2026, 4, 18),
+        status="active",
+        needs_confirmation=False,
+    )
+
+    def fake_post(*args, **kwargs):
+        raise AssertionError("httpx.post should not be called for unsupported providers")
+
+    monkeypatch.setattr("app.services.notifier.httpx.post", fake_post)
+
+    assert notifier.send(item=item, stage="7d", days_left=10) is False
+
+
 def test_notifier_returns_false_when_webhook_request_fails(monkeypatch):
     notifier = Notifier(provider="generic", webhook_url="https://example.com/webhook")
     item = FoodItem(

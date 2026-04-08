@@ -30,6 +30,18 @@ def test_voice_ingestion_keeps_explicit_date_and_location(client):
     assert payload["item"]["needs_confirmation"] is False
 
 
+def test_voice_ingestion_invalid_explicit_iso_date_falls_back_safely(client):
+    response = client.post(
+        "/api/items/voice",
+        json={"raw_text": "2026-02-31过期"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["item"]["expiry_date"] == (date.today() + timedelta(days=30)).isoformat()
+    assert payload["item"]["needs_confirmation"] is True
+
+
 @pytest.mark.parametrize(
     ("raw_text", "expected_date", "expected_needs_confirmation"),
     [

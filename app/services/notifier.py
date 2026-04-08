@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 PUSHPLUS_ENDPOINT = "https://www.pushplus.plus/send"
 SERVERCHAN_ENDPOINT = "https://sctapi.ftqq.com/{sendkey}.send"
+VALID_PROVIDERS = {"generic", "pushplus", "serverchan"}
 
 
 class Notifier:
@@ -26,6 +27,10 @@ class Notifier:
 
     def send(self, *, item, stage: str, days_left: int) -> bool:
         message = self._build_message(item=item, stage=stage, days_left=days_left)
+
+        if self.provider not in VALID_PROVIDERS:
+            logger.error("Unsupported notification provider: %s", self.provider)
+            return False
 
         if self.provider == "pushplus":
             if not self.pushplus_token:
@@ -112,7 +117,4 @@ class Notifier:
         )
 
     def _normalize_provider(self, provider: str) -> str:
-        normalized = provider.strip().lower()
-        if normalized not in {"generic", "pushplus", "serverchan"}:
-            return "generic"
-        return normalized
+        return provider.strip().lower()

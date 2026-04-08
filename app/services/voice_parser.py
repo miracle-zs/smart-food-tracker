@@ -79,10 +79,15 @@ class VoiceParser:
         match = re.search(r"(\d{4})-(\d{2})-(\d{2})", raw_text)
         if not match:
             return None
-        return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        try:
+            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except ValueError:
+            return None
 
     def _extract_fallback_date(self, raw_text: str) -> date | None:
         search_text = self._extract_expiry_search_text(raw_text)
+        if search_text is None:
+            return None
         candidates: list[tuple[int, date]] = []
         candidates.extend(self._extract_relative_date_candidates(search_text))
         candidates.extend(self._extract_current_year_month_end_candidates(search_text))
@@ -93,10 +98,10 @@ class VoiceParser:
 
         return max(candidates, key=lambda candidate: candidate[0])[1]
 
-    def _extract_expiry_search_text(self, raw_text: str) -> str:
+    def _extract_expiry_search_text(self, raw_text: str) -> str | None:
         cutoff = max(raw_text.rfind(keyword) for keyword in ("过期", "到期", "截止"))
         if cutoff == -1:
-            return raw_text
+            return None
         return raw_text[:cutoff]
 
     def _extract_relative_date_candidates(self, raw_text: str) -> list[tuple[int, date]]:

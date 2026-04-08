@@ -1,4 +1,5 @@
 import pytest
+from datetime import date, timedelta
 
 from app.models.food_item import FoodItem
 
@@ -27,7 +28,8 @@ def test_webhook_ingestion_accepts_common_text_payloads(client, db_session, payl
     item = db_session.query(FoodItem).one()
     assert item.name == "鸡柳"
     assert item.location == "冷冻室"
-    assert item.needs_confirmation is False
+    assert item.expiry_date == date.today() + timedelta(days=30)
+    assert item.needs_confirmation is True
 
 
 def test_webhook_ingestion_rejects_payloads_without_text(client):
