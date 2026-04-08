@@ -70,10 +70,13 @@ def test_voice_ingestion_parses_relative_and_local_dates(client, raw_text, expec
     ("raw_text", "expected_date", "expected_needs_confirmation"),
     [
         (
-            "2026-04-01买的牛奶明天过期",
-            (date.today() + timedelta(days=1)).isoformat(),
+            "2026-04-01买的牛奶，2026-04-05过期",
+            "2026-04-05",
             False,
         ),
+        ("过期时间是2026-10-31", "2026-10-31", False),
+        ("到期日是10月31日", date(CURRENT_YEAR, 10, 31).isoformat(), False),
+        ("到期是明天", (date.today() + timedelta(days=1)).isoformat(), False),
         ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(CURRENT_YEAR, 10, 31).isoformat(), False),
         ("今天买的牛奶明天过期", (date.today() + timedelta(days=1)).isoformat(), False),
         ("13月底过期", (date.today() + timedelta(days=30)).isoformat(), True),

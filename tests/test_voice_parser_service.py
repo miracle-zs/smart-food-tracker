@@ -74,8 +74,12 @@ def test_voice_parser_prefers_expiry_phrase_over_context_words():
 
     cases = [
         ("2026-04-01买的牛奶明天过期", date.today() + timedelta(days=1)),
+        ("过期时间是2026-10-31", date(2026, 10, 31)),
+        ("到期日是10月31日", date(CURRENT_YEAR, 10, 31)),
+        ("到期是明天", date.today() + timedelta(days=1)),
         ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(CURRENT_YEAR, 10, 31)),
         ("今天买的牛奶明天过期", date.today() + timedelta(days=1)),
+        ("2026-04-01买的牛奶，2026-04-05过期", date(2026, 4, 5)),
     ]
 
     for raw_text, expected_date in cases:

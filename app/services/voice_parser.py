@@ -28,6 +28,7 @@ PRODUCT_KEYWORDS = [
 ]
 
 logger = logging.getLogger(__name__)
+ExpiryCandidate = tuple[int, date, tuple[int, int, int]]
 
 
 @dataclass
@@ -54,24 +55,18 @@ class VoiceParser:
         if llm_parsed is not None:
             return llm_parsed
 
-        search_text = self._extract_expiry_search_text(raw_text)
         location = self._extract_location(raw_text)
         name = self._extract_name(raw_text)
 
-        if search_text is not None:
-            candidates = self._extract_explicit_date_candidates(search_text)
-            candidates.extend(self._extract_relative_date_candidates(search_text))
-            candidates.extend(self._extract_current_year_month_end_candidates(search_text))
-            candidates.extend(self._extract_current_year_month_day_candidates(search_text))
-
-            if candidates:
-                expiry_date = max(candidates, key=lambda candidate: candidate[0])[1]
-                return ParsedVoiceItem(
-                    name=name,
-                    location=location,
-                    expiry_date=expiry_date,
-                    needs_confirmation=False,
-                )
+        candidates = self._extract_expiry_candidates(raw_text)
+        if candidates:
+            expiry_date = self._select_expiry_candidate(candidates)
+            return ParsedVoiceItem(
+                name=name,
+                location=location,
+                expiry_date=expiry_date,
+                needs_confirmation=False,
+            )
 
         return ParsedVoiceItem(
             name=name,
@@ -84,19 +79,47 @@ class VoiceParser:
         if raw_text is None:
             return []
 
-        match = re.search(r"(\d{4})-(\d{2})-(\d{2})", raw_text)
-        if not match:
-            return []
-        try:
-            return [(match.start(), date(int(match.group(1)), int(match.group(2)), int(match.group(3))))]
-        except ValueError:
+        candidates: list[tuple[int, date]] = []
+        for match in re.finditer(r"(\d{4})-(\d{2})-(\d{2})", raw_text):
+            try:
+                candidates.append(
+                    (
+                        match.start(),
+                        date(int(match.group(1)), int(match.group(2)), int(match.group(3))),
+                    )
+                )
+            except ValueError:
+                continue
+        return candidates
+
+    def _extract_expiry_candidates(self, raw_text: str) -> list[ExpiryCandidate]:
+        keyword_positions = self._extract_expiry_keyword_positions(raw_text)
+        if not keyword_positions:
             return []
 
-    def _extract_expiry_search_text(self, raw_text: str) -> str | None:
-        cutoff = max(raw_text.rfind(keyword) for keyword in ("过期", "到期", "截止"))
-        if cutoff == -1:
-            return None
-        return raw_text[:cutoff]
+        candidates: list[tuple[int, date]] = []
+        candidates.extend(self._extract_explicit_date_candidates(raw_text))
+        candidates.extend(self._extract_relative_date_candidates(raw_text))
+        candidates.extend(self._extract_current_year_month_end_candidates(raw_text))
+        candidates.extend(self._extract_current_year_month_day_candidates(raw_text))
+        return [(position, value, self._nearest_keyword_distance(position, keyword_positions)) for position, value in candidates]
+
+    def _extract_expiry_keyword_positions(self, raw_text: str) -> list[int]:
+        positions: list[int] = []
+        for keyword in ("过期", "到期", "截止"):
+            positions.extend(match.start() for match in re.finditer(keyword, raw_text))
+        return positions
+
+    def _nearest_keyword_distance(self, candidate_position: int, keyword_positions: list[int]) -> tuple[int, int, int]:
+        nearest_position = min(keyword_positions, key=lambda position: abs(position - candidate_position))
+        return (
+            abs(candidate_position - nearest_position),
+            0 if candidate_position >= nearest_position else 1,
+            candidate_position,
+        )
+
+    def _select_expiry_candidate(self, candidates: list[ExpiryCandidate]) -> date:
+        return min(candidates, key=lambda candidate: candidate[2])[1]
 
     def _extract_relative_date_candidates(self, raw_text: str) -> list[tuple[int, date]]:
         candidates: list[tuple[int, date]] = []
