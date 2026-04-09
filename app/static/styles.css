@@ -261,6 +261,7 @@ h3 {
 .risk-group {
   --group-accent: var(--accent);
   display: grid;
+  position: relative;
   gap: 0.95rem;
   padding: 1rem;
   border-radius: var(--radius-md);
@@ -683,7 +684,7 @@ button:disabled {
     align-items: start;
   }
 
-  .item-card > :last-child {
+  .item-actions {
     grid-column: 1 / -1;
   }
 }
@@ -738,10 +739,6 @@ button:disabled {
 
   .item-card {
     grid-template-columns: 1fr;
-  }
-
-  .item-card > :last-child {
-    grid-column: auto;
   }
 
   .item-actions,
