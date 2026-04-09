@@ -24,6 +24,7 @@ const expiredBucket = document.querySelector("#expired-items .risk-items");
 const due3Bucket = document.querySelector("#due-3-days-items .risk-items");
 const due7Bucket = document.querySelector("#due-7-days-items .risk-items");
 const safeBucket = document.querySelector("#safe-items .risk-items");
+let inventoryRequestSeq = 0;
 
 const urgencyLabelMap = {
   expired: "已过期",
@@ -82,6 +83,10 @@ function buildInventoryQuery() {
 }
 
 function renderLocations(items) {
+  if (items.length === 0) {
+    return;
+  }
+
   const currentValue = locationFilter.value;
   const options = [...new Set(items.map((item) => item.location).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, "zh-Hans-CN"),
@@ -263,13 +268,20 @@ async function loadActiveDashboardItems() {
 }
 
 async function loadInventoryItems() {
+  const requestSeq = ++inventoryRequestSeq;
   try {
     const items = await requestJson(`/api/items${buildInventoryQuery()}`, {
       method: "GET",
     });
+    if (requestSeq !== inventoryRequestSeq) {
+      return;
+    }
     renderLocations(items);
     renderInventory(items);
   } catch (error) {
+    if (requestSeq !== inventoryRequestSeq) {
+      return;
+    }
     setFeedback("库存列表加载失败，请稍后重试。", true);
   }
 }

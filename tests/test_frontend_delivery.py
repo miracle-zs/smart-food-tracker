@@ -75,6 +75,10 @@ def test_dashboard_script_exposes_v1_loading_and_interaction_hooks(client):
 
     expected_fragments = [
         'requestJson("/api/items/summary"',
+        "let inventoryRequestSeq = 0;",
+        "const requestSeq = ++inventoryRequestSeq;",
+        "if (requestSeq !== inventoryRequestSeq) {",
+        'if (items.length === 0) {',
         'document.querySelector("#summary-total-count")',
         'document.querySelector("#inventory-search")',
         'document.querySelector("#sort-filter")',
