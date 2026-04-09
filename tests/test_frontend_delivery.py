@@ -155,5 +155,6 @@ def test_dashboard_stylesheet_exposes_v1_layout_and_responsive_rules(client):
     assert ".item-card > :last-child" not in stylesheet
     assert ".risk-group {\n  --group-accent: var(--accent);" in stylesheet
     assert ".risk-group::before" in stylesheet
-    assert "@media (max-width: 900px)" in stylesheet
-    assert ".item-actions {\n    grid-column: 1 / -1;" in stylesheet
+    mobile_block = stylesheet.split("@media (max-width: 700px)", 1)[1]
+    assert ".hero-metrics" in mobile_block
+    assert "grid-template-columns: 1fr;" in mobile_block

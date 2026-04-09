@@ -897,6 +897,7 @@ button:disabled {
   .instrument-summary-grid,
   .risk-board-grid,
   .chamber-grid,
+  .hero-metrics,
   .filters {
     grid-template-columns: 1fr;
   }
