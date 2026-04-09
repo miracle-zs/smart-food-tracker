@@ -1,19 +1,58 @@
+from html.parser import HTMLParser
+
+
+class ElementCaptureParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.elements = []
+
+    def handle_starttag(self, tag, attrs):
+        self.elements.append((tag, dict(attrs)))
+
+
+def _parse_elements(html):
+    parser = ElementCaptureParser()
+    parser.feed(html)
+    return parser.elements
+
+
 def test_dashboard_shell_serves_forms_and_item_board(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "SmartFood Tracker" in response.text
-    assert "manual-entry-form" in response.text
-    assert "voice-entry-form" in response.text
-    assert "summary-section" in response.text
-    assert "risk-board-section" in response.text
-    assert "pending-confirmation-section" in response.text
-    assert "quick-intake-section" in response.text
-    assert "inventory-section" in response.text
-    assert "items-board" in response.text
-    assert "edit-confirm-panel" in response.text
-    assert "confirm-pending-item" in response.text
-    assert "/static/app.js" in response.text
+    elements = _parse_elements(response.text)
+
+    section_ids = {
+        attrs.get("id")
+        for tag, attrs in elements
+        if tag == "section"
+    }
+    assert {
+        "summary-section",
+        "risk-board-section",
+        "edit-confirm-panel",
+        "quick-intake-section",
+        "inventory-section",
+    }.issubset(section_ids)
+
+    strong_ids = {
+        attrs.get("id")
+        for tag, attrs in elements
+        if tag == "strong"
+    }
+    assert {
+        "summary-total-count",
+        "summary-pending-count",
+        "summary-due-7-days-count",
+        "summary-expired-count",
+    }.issubset(strong_ids)
+
+    assert any(tag == "form" and attrs.get("id") == "manual-entry-form" for tag, attrs in elements)
+    assert any(tag == "form" and attrs.get("id") == "voice-entry-form" for tag, attrs in elements)
+    assert any(tag == "form" and attrs.get("id") == "pending-item-form" for tag, attrs in elements)
+    assert any(tag == "button" and attrs.get("id") == "confirm-pending-item" for tag, attrs in elements)
+    assert any(tag == "div" and attrs.get("id") == "items-board" for tag, attrs in elements)
+    assert any(tag == "script" and attrs.get("src") == "/static/app.js" for tag, attrs in elements)
 
 
 def test_dashboard_script_resets_review_panel_after_save_and_confirm(client):
