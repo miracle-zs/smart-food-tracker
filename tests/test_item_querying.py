@@ -46,6 +46,34 @@ def test_item_querying_supports_search_filters_and_sorting(client, db_session):
         expiry_date=date(2026, 4, 20),
         entry_date=datetime(2026, 4, 4, 8, 0, tzinfo=timezone.utc),
     )
+    _add_item(
+        db_session,
+        name="Snack 50%",
+        location="Shelf 1",
+        expiry_date=date(2026, 4, 21),
+        entry_date=datetime(2026, 4, 5, 8, 0, tzinfo=timezone.utc),
+    )
+    _add_item(
+        db_session,
+        name="Snack 500",
+        location="Shelf 1",
+        expiry_date=date(2026, 4, 22),
+        entry_date=datetime(2026, 4, 6, 8, 0, tzinfo=timezone.utc),
+    )
+    _add_item(
+        db_session,
+        name="Box_1",
+        location="Shelf 2",
+        expiry_date=date(2026, 4, 23),
+        entry_date=datetime(2026, 4, 7, 8, 0, tzinfo=timezone.utc),
+    )
+    _add_item(
+        db_session,
+        name="BoxA1",
+        location="Shelf 2",
+        expiry_date=date(2026, 4, 24),
+        entry_date=datetime(2026, 4, 8, 8, 0, tzinfo=timezone.utc),
+    )
 
     name_search = client.get("/api/items?q=milk")
     assert name_search.status_code == 200
@@ -63,6 +91,14 @@ def test_item_querying_supports_search_filters_and_sorting(client, db_session):
     assert location_filtered_search.status_code == 200
     assert location_filtered_search.json() == []
 
+    percent_literal_search = client.get("/api/items?q=50%")
+    assert percent_literal_search.status_code == 200
+    assert [item["name"] for item in percent_literal_search.json()] == ["Snack 50%"]
+
+    underscore_literal_search = client.get("/api/items?q=Box_1")
+    assert underscore_literal_search.status_code == 200
+    assert [item["name"] for item in underscore_literal_search.json()] == ["Box_1"]
+
     default_sorted = client.get("/api/items")
     assert default_sorted.status_code == 200
     assert [item["name"] for item in default_sorted.json()] == [
@@ -70,6 +106,10 @@ def test_item_querying_supports_search_filters_and_sorting(client, db_session):
         "Whole Milk",
         "Chocolate Milk",
         "Paper Towels",
+        "Snack 50%",
+        "Snack 500",
+        "Box_1",
+        "BoxA1",
     ]
 
     expiry_asc_sorted = client.get("/api/items?sort=expiry_date_asc")
@@ -79,11 +119,19 @@ def test_item_querying_supports_search_filters_and_sorting(client, db_session):
         "Whole Milk",
         "Chocolate Milk",
         "Paper Towels",
+        "Snack 50%",
+        "Snack 500",
+        "Box_1",
+        "BoxA1",
     ]
 
     expiry_desc_sorted = client.get("/api/items?sort=expiry_date_desc")
     assert expiry_desc_sorted.status_code == 200
     assert [item["name"] for item in expiry_desc_sorted.json()] == [
+        "BoxA1",
+        "Box_1",
+        "Snack 500",
+        "Snack 50%",
         "Paper Towels",
         "Chocolate Milk",
         "Whole Milk",
@@ -93,6 +141,10 @@ def test_item_querying_supports_search_filters_and_sorting(client, db_session):
     entry_desc_sorted = client.get("/api/items?sort=entry_date_desc")
     assert entry_desc_sorted.status_code == 200
     assert [item["name"] for item in entry_desc_sorted.json()] == [
+        "BoxA1",
+        "Box_1",
+        "Snack 500",
+        "Snack 50%",
         "Paper Towels",
         "Greek Yogurt",
         "Chocolate Milk",
@@ -106,4 +158,8 @@ def test_item_querying_supports_search_filters_and_sorting(client, db_session):
         "Whole Milk",
         "Chocolate Milk",
         "Paper Towels",
+        "Snack 50%",
+        "Snack 500",
+        "Box_1",
+        "BoxA1",
     ]

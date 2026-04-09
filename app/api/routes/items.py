@@ -66,6 +66,10 @@ def to_item_response(item: FoodItem) -> ItemResponse:
     )
 
 
+def _escape_like_pattern(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _normalize_webhook_text(value: object) -> str | None:
     if isinstance(value, str):
         text = value.strip()
@@ -159,11 +163,11 @@ def list_items(
     if location:
         statement = statement.where(FoodItem.location == location)
     if q and q.strip():
-        pattern = f"%{q.strip()}%"
+        pattern = f"%{_escape_like_pattern(q.strip())}%"
         statement = statement.where(
             or_(
-                FoodItem.name.ilike(pattern),
-                FoodItem.location.ilike(pattern),
+                FoodItem.name.ilike(pattern, escape="\\"),
+                FoodItem.location.ilike(pattern, escape="\\"),
             )
         )
 
