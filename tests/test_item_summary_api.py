@@ -50,9 +50,9 @@ def test_item_summary_api_returns_inventory_counts(client, db_session):
         FoodItem(
             name="大米",
             location="冰箱冷冻室",
-            expiry_date=today + timedelta(days=30),
+            expiry_date=today + timedelta(days=2),
             status="discarded",
-            needs_confirmation=False,
+            needs_confirmation=True,
         )
     )
     db_session.add(
@@ -61,7 +61,7 @@ def test_item_summary_api_returns_inventory_counts(client, db_session):
             location="冰箱冷冻室",
             expiry_date=today - timedelta(days=4),
             status="consumed",
-            needs_confirmation=False,
+            needs_confirmation=True,
         )
     )
     db_session.commit()
@@ -72,7 +72,7 @@ def test_item_summary_api_returns_inventory_counts(client, db_session):
     payload = response.json()
     assert payload["total_count"] == 8
     assert payload["pending_confirmation_count"] == 1
-    assert payload["expired_count"] == 2
+    assert payload["expired_count"] == 1
     assert payload["due_within_3_days_count"] == 2
     assert payload["due_within_7_days_count"] == 4
     assert payload["distinct_location_count"] == 4

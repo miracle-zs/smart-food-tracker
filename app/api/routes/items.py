@@ -163,6 +163,7 @@ def list_items(
 @router.get("/summary", response_model=ItemSummaryResponse)
 def get_item_summary(db: Session = Depends(get_db)) -> ItemSummaryResponse:
     items = list(db.scalars(select(FoodItem).order_by(FoodItem.id.asc())))
+    today = date.today()
 
     total_count = len(items)
     pending_confirmation_count = 0
@@ -172,7 +173,10 @@ def get_item_summary(db: Session = Depends(get_db)) -> ItemSummaryResponse:
     active_locations: Counter[str] = Counter()
 
     for item in items:
-        days_left = (item.expiry_date - date.today()).days
+        if item.status != "active":
+            continue
+
+        days_left = (item.expiry_date - today).days
         if item.needs_confirmation:
             pending_confirmation_count += 1
         if days_left < 0:
@@ -181,8 +185,7 @@ def get_item_summary(db: Session = Depends(get_db)) -> ItemSummaryResponse:
             due_within_3_days_count += 1
         if 0 <= days_left <= 7:
             due_within_7_days_count += 1
-        if item.status == "active":
-            active_locations[item.location] += 1
+        active_locations[item.location] += 1
 
     location_counts = [
         ItemSummaryLocationCount(location=location, count=count)
