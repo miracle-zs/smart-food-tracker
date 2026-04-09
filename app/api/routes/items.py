@@ -3,7 +3,7 @@ from collections.abc import Generator
 from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
@@ -149,14 +149,30 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)) -> ItemRespo
 def list_items(
     status: str | None = Query(default=None),
     location: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    sort: str | None = Query(default=None),
     db: Session = Depends(get_db),
-) -> list[FoodItem]:
+) -> list[ItemResponse]:
     statement = select(FoodItem)
     if status:
         statement = statement.where(FoodItem.status == status)
     if location:
         statement = statement.where(FoodItem.location == location)
-    statement = statement.order_by(FoodItem.expiry_date.asc(), FoodItem.id.asc())
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(
+            or_(
+                FoodItem.name.ilike(pattern),
+                FoodItem.location.ilike(pattern),
+            )
+        )
+
+    if sort == "expiry_date_desc":
+        statement = statement.order_by(FoodItem.expiry_date.desc(), FoodItem.id.asc())
+    elif sort == "entry_date_desc":
+        statement = statement.order_by(FoodItem.entry_date.desc(), FoodItem.id.asc())
+    else:
+        statement = statement.order_by(FoodItem.expiry_date.asc(), FoodItem.id.asc())
     return [to_item_response(item) for item in db.scalars(statement)]
 
 

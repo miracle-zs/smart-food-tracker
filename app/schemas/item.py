@@ -58,6 +58,9 @@ class ItemSummaryResponse(BaseModel):
     location_counts: list[ItemSummaryLocationCount]
 
 
+ItemListSort = Literal["expiry_date_asc", "expiry_date_desc", "entry_date_desc"]
+
+
 class ItemStatusUpdate(BaseModel):
     status: Literal["consumed", "discarded"]
 
