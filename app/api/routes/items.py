@@ -1,5 +1,6 @@
 from datetime import date
 from collections.abc import Generator
+from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -13,6 +14,8 @@ from app.schemas.item import (
     ItemResponse,
     ItemStatusUpdate,
     ItemUpdate,
+    ItemSummaryLocationCount,
+    ItemSummaryResponse,
     VoiceItemCreate,
     VoiceItemResponse,
     VoiceParseResult,
@@ -155,6 +158,46 @@ def list_items(
         statement = statement.where(FoodItem.location == location)
     statement = statement.order_by(FoodItem.expiry_date.asc(), FoodItem.id.asc())
     return [to_item_response(item) for item in db.scalars(statement)]
+
+
+@router.get("/summary", response_model=ItemSummaryResponse)
+def get_item_summary(db: Session = Depends(get_db)) -> ItemSummaryResponse:
+    items = list(db.scalars(select(FoodItem).order_by(FoodItem.id.asc())))
+
+    total_count = len(items)
+    pending_confirmation_count = 0
+    expired_count = 0
+    due_within_3_days_count = 0
+    due_within_7_days_count = 0
+    active_locations: Counter[str] = Counter()
+
+    for item in items:
+        days_left = (item.expiry_date - date.today()).days
+        if item.needs_confirmation:
+            pending_confirmation_count += 1
+        if days_left < 0:
+            expired_count += 1
+        if 0 <= days_left <= 3:
+            due_within_3_days_count += 1
+        if 0 <= days_left <= 7:
+            due_within_7_days_count += 1
+        if item.status == "active":
+            active_locations[item.location] += 1
+
+    location_counts = [
+        ItemSummaryLocationCount(location=location, count=count)
+        for location, count in sorted(active_locations.items(), key=lambda entry: entry[0])
+    ]
+
+    return ItemSummaryResponse(
+        total_count=total_count,
+        pending_confirmation_count=pending_confirmation_count,
+        expired_count=expired_count,
+        due_within_3_days_count=due_within_3_days_count,
+        due_within_7_days_count=due_within_7_days_count,
+        distinct_location_count=len(active_locations),
+        location_counts=location_counts,
+    )
 
 
 @router.post("/voice", response_model=VoiceItemResponse, status_code=status.HTTP_201_CREATED)
