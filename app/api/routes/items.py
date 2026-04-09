@@ -1,11 +1,13 @@
+import secrets
 from datetime import date
 from collections.abc import Generator
 from collections import Counter
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.base import Base
 from app.db.session import SessionLocal, engine, ensure_sqlite_schema
 from app.models.food_item import FoodItem
@@ -135,6 +137,25 @@ def _persist_voice_item(raw_text: str, db: Session) -> VoiceItemResponse:
     )
 
 
+def _require_xiaoai_webhook_token(x_webhook_token: str | None = Header(default=None)) -> None:
+    expected_token = settings.xiaoai_webhook_token
+    if not expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="XiaoAi webhook token is not configured",
+        )
+    if x_webhook_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing webhook token",
+        )
+    if not secrets.compare_digest(x_webhook_token, expected_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook token",
+        )
+
+
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)) -> ItemResponse:
     item = FoodItem(
@@ -234,6 +255,20 @@ def create_item_from_voice(
 @router.post("/voice/webhook", response_model=WebhookIngestionResponse, status_code=status.HTTP_201_CREATED)
 def create_item_from_voice_webhook(
     payload: VoiceWebhookCreate,
+    db: Session = Depends(get_db),
+) -> WebhookIngestionResponse:
+    result = _persist_voice_item(_extract_webhook_text(payload), db)
+    return WebhookIngestionResponse(ok=True, item_id=result.item.id)
+
+
+@router.post(
+    "/xiaoai/voice/webhook",
+    response_model=WebhookIngestionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_item_from_xiaoai_voice_webhook(
+    payload: VoiceWebhookCreate,
+    _: None = Depends(_require_xiaoai_webhook_token),
     db: Session = Depends(get_db),
 ) -> WebhookIngestionResponse:
     result = _persist_voice_item(_extract_webhook_text(payload), db)

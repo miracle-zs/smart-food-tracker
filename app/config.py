@@ -11,6 +11,7 @@ class Settings(BaseModel):
     app_name: str = os.getenv("APP_NAME", "SmartFood Tracker")
     database_url: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'smartfood.db'}")
     reminder_hour: int = int(os.getenv("REMINDER_HOUR", "10"))
+    xiaoai_webhook_token: str | None = os.getenv("XIAOAI_WEBHOOK_TOKEN")
     llm_api_key: str | None = os.getenv("LLM_API_KEY")
     llm_base_url: str | None = os.getenv("LLM_BASE_URL")
     llm_model: str | None = os.getenv("LLM_MODEL")

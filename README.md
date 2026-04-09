@@ -31,6 +31,7 @@ python3 -m venv .venv
 ```bash
 export DATABASE_URL="sqlite:///./smartfood.db"
 export REMINDER_HOUR="10"
+export XIAOAI_WEBHOOK_TOKEN="replace-with-a-long-random-token"
 export LLM_API_KEY="your-api-key"
 export LLM_BASE_URL="https://api.openai.com/v1"
 export LLM_MODEL="gpt-4.1-mini"
@@ -42,6 +43,7 @@ export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 
 说明：
 
+- `XIAOAI_WEBHOOK_TOKEN` 用于保护小爱同学专用 Webhook；未配置时专用入口会直接拒绝请求
 - 未设置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` 时，语音解析自动回退到本地规则解析
 - `NOTIFICATION_PROVIDER` 支持 `generic` / `pushplus` / `serverchan`
 - `generic` 模式下使用 `NOTIFICATION_WEBHOOK_URL` 发送原始提醒 Webhook；如果未配置地址，系统仅记录 mock 日志
@@ -64,6 +66,7 @@ export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 - `GET /api/items`：返回库存列表，支持筛选、搜索和排序
 - `POST /api/items/voice`：接收语音转写文本，按本地规则或 LLM 解析后创建食材
 - `POST /api/items/voice/webhook`：接收第三方设备或小爱同学风格的 Webhook 文本载荷
+- `POST /api/items/xiaoai/voice/webhook`：小爱同学专用 Webhook，要求配置 `XIAOAI_WEBHOOK_TOKEN` 并携带 `X-Webhook-Token` 请求头
 - `PUT /api/items/{id}`：仅允许编辑 `active` 且 `needs_confirmation=true` 的待确认条目
 - `POST /api/items/{id}/confirm`：确认待确认条目并清除 `needs_confirmation`
 
@@ -86,6 +89,15 @@ Webhook 入口支持的常见文本字段包括：
 
 ```json
 { "ok": true, "item_id": 1 }
+```
+
+如果接小爱同学，优先使用专用入口，并带上 token：
+
+```bash
+curl -X POST "https://your-domain.com/api/items/xiaoai/voice/webhook" \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: ${XIAOAI_WEBHOOK_TOKEN}" \
+  -d '{"text":"今天放了一袋鸡柳在冷冻室，10月31日过期"}'
 ```
 
 ## 已实现能力
