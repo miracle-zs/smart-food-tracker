@@ -8,7 +8,7 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="hero-panel">
+      <section class="hero-panel top-control-rail">
         <div class="hero-copy">
           <p class="eyebrow">家庭库存总控台</p>
           <h1>SmartFood Tracker</h1>
@@ -33,7 +33,7 @@
           <p class="panel-kicker">Summary</p>
           <h2>今日概览</h2>
         </div>
-        <div class="summary-metrics">
+        <div class="summary-metrics instrument-summary-grid">
           <article class="metric-card">
             <span class="metric-label">库存总数</span>
             <strong id="summary-total-count" data-summary-metric="total">--</strong>
@@ -58,7 +58,7 @@
           <p class="panel-kicker">Risk Board</p>
           <h2>风险看板</h2>
         </div>
-        <div class="risk-board-grid">
+        <div class="risk-board-grid chamber-grid">
           <article class="panel risk-group" id="expired-items">
             <h3>已过期</h3>
             <div class="risk-items"></div>
@@ -78,7 +78,7 @@
         </div>
       </section>
 
-      <section class="pending-confirmation-section panel" id="edit-confirm-panel">
+      <section class="pending-confirmation-section panel pending-workbench" id="edit-confirm-panel">
         <div class="panel-heading">
           <p class="panel-kicker">Pending Confirmation</p>
           <h2>待确认条目</h2>
@@ -174,7 +174,7 @@
       </section>
 
       <section class="inventory-section board-shell" id="inventory-section">
-        <div class="board-header">
+        <div class="board-header inventory-command-strip">
           <div>
             <p class="panel-kicker">Full Inventory</p>
             <h2>完整库存</h2>
