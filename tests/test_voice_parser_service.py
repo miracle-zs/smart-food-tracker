@@ -1,6 +1,9 @@
-from datetime import date
+from datetime import date, timedelta
 
 from app.services.voice_parser import VoiceParser
+
+
+CURRENT_YEAR = date.today().year
 
 
 class FakeResponse:
@@ -47,3 +50,52 @@ def test_voice_parser_uses_llm_when_configured(monkeypatch):
     assert parsed.location == "冷冻室"
     assert parsed.expiry_date == date(2026, 10, 31)
     assert parsed.needs_confirmation is False
+
+
+def test_voice_parser_falls_back_for_relative_and_local_dates():
+    parser = VoiceParser(api_key="", base_url="", model="")
+
+    cases = [
+        ("今年10月底过期", date(CURRENT_YEAR, 10, 31)),
+        ("10月31日过期", date(CURRENT_YEAR, 10, 31)),
+        ("3天后过期", date.today() + timedelta(days=3)),
+        ("明天过期", date.today() + timedelta(days=1)),
+    ]
+
+    for raw_text, expected_date in cases:
+        parsed = parser.parse(raw_text)
+
+        assert parsed.expiry_date == expected_date
+        assert parsed.needs_confirmation is False
+
+
+def test_voice_parser_prefers_expiry_phrase_over_context_words():
+    parser = VoiceParser(api_key="", base_url="", model="")
+
+    cases = [
+        ("2026-04-01买的牛奶明天过期", date.today() + timedelta(days=1)),
+        ("过期时间是2026-10-31", date(2026, 10, 31)),
+        ("到期日是10月31日", date(CURRENT_YEAR, 10, 31)),
+        ("到期是明天", date.today() + timedelta(days=1)),
+        ("今天放了一袋鸡柳在冷冻室，10月31日过期", date(CURRENT_YEAR, 10, 31)),
+        ("今天买的牛奶明天过期", date.today() + timedelta(days=1)),
+        ("2026-04-01买的牛奶，2026-04-05过期", date(2026, 4, 5)),
+    ]
+
+    for raw_text, expected_date in cases:
+        parsed = parser.parse(raw_text)
+
+        assert parsed.expiry_date == expected_date
+        assert parsed.needs_confirmation is False
+
+
+def test_voice_parser_invalid_month_falls_back_safely():
+    parser = VoiceParser(api_key="", base_url="", model="")
+
+    cases = ["13月底过期", "13月31日过期", "2月31日过期", "11月31日过期"]
+
+    for raw_text in cases:
+        parsed = parser.parse(raw_text)
+
+        assert parsed.expiry_date == date.today() + timedelta(days=30)
+        assert parsed.needs_confirmation is True

@@ -124,6 +124,46 @@ h2 {
   gap: 22px;
 }
 
+.review-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.review-panel-layout {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.review-summary {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.review-form {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 251, 245, 0.78);
+}
+
+.review-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-actions .action-button {
+  background: rgba(34, 28, 21, 0.06);
+  color: var(--ink);
+}
+
+.review-panel.is-active {
+  border-color: rgba(169, 73, 47, 0.28);
+}
+
 .panel,
 .board-shell {
   padding: 24px;
@@ -289,6 +329,12 @@ button:hover {
   background: rgba(34, 28, 21, 0.1);
 }
 
+.action-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .empty-state {
   padding: 34px 18px;
   border: 1px dashed rgba(34, 28, 21, 0.18);
@@ -299,6 +345,7 @@ button:hover {
 @media (max-width: 960px) {
   .hero-panel,
   .control-grid,
+  .review-panel-layout,
   .item-card {
     grid-template-columns: 1fr;
   }

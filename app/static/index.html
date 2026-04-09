@@ -74,6 +74,51 @@
         </article>
       </section>
 
+      <section class="panel review-panel" id="edit-confirm-panel">
+        <div class="panel-heading">
+          <p class="panel-kicker">Review Queue</p>
+          <h2>编辑 / 确认</h2>
+        </div>
+        <div class="review-panel-layout">
+          <div class="review-copy">
+            <p id="selected-item-summary" class="review-summary">
+              选择一个待确认条目后，可以在这里修正名称、位置和过期日期。
+            </p>
+            <p class="note">
+              点击看板上的“编辑”打开编辑状态，点击“确认”即可清除待确认标记。
+            </p>
+          </div>
+          <form id="pending-item-form" class="entry-form review-form">
+            <input name="item_id" type="hidden" />
+            <label>
+              <span>食材名称</span>
+              <input
+                id="pending-item-name"
+                name="name"
+                type="text"
+                placeholder="请选择一个待确认条目"
+                required
+                disabled
+              />
+            </label>
+            <label>
+              <span>存放位置</span>
+              <input id="pending-item-location" name="location" type="text" required disabled />
+            </label>
+            <label>
+              <span>过期日期</span>
+              <input id="pending-item-expiry-date" name="expiry_date" type="date" required disabled />
+            </label>
+            <div class="review-actions">
+              <button type="submit" disabled>保存修改</button>
+              <button type="button" id="confirm-pending-item" class="action-button" disabled>
+                确认无误
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
       <section class="board-shell">
         <div class="board-header">
           <div>

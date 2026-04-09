@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,8 +10,22 @@ class ItemCreate(BaseModel):
     expiry_date: date
 
 
+class ItemUpdate(ItemCreate):
+    pass
+
+
 class VoiceItemCreate(BaseModel):
     raw_text: str
+
+
+class VoiceWebhookCreate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    text: Any = None
+    raw_text: Any = None
+    query: Any = None
+    content: Any = None
+    message: Any = None
 
 
 class ItemResponse(BaseModel):
@@ -29,7 +44,7 @@ class ItemResponse(BaseModel):
 
 
 class ItemStatusUpdate(BaseModel):
-    status: str
+    status: Literal["consumed", "discarded"]
 
 
 class VoiceParseResult(BaseModel):
@@ -42,3 +57,8 @@ class VoiceParseResult(BaseModel):
 class VoiceItemResponse(BaseModel):
     parsed_data: VoiceParseResult
     item: ItemResponse
+
+
+class WebhookIngestionResponse(BaseModel):
+    ok: bool
+    item_id: int

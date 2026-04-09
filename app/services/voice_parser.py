@@ -1,3 +1,4 @@
+import calendar
 import json
 import logging
 import re
@@ -27,6 +28,7 @@ PRODUCT_KEYWORDS = [
 ]
 
 logger = logging.getLogger(__name__)
+ExpiryCandidate = tuple[int, date, tuple[int, int, int]]
 
 
 @dataclass
@@ -53,15 +55,16 @@ class VoiceParser:
         if llm_parsed is not None:
             return llm_parsed
 
-        explicit_date = self._extract_explicit_date(raw_text)
         location = self._extract_location(raw_text)
         name = self._extract_name(raw_text)
 
-        if explicit_date:
+        candidates = self._extract_expiry_candidates(raw_text)
+        if candidates:
+            expiry_date = self._select_expiry_candidate(candidates)
             return ParsedVoiceItem(
                 name=name,
                 location=location,
-                expiry_date=explicit_date,
+                expiry_date=expiry_date,
                 needs_confirmation=False,
             )
 
@@ -72,11 +75,96 @@ class VoiceParser:
             needs_confirmation=True,
         )
 
-    def _extract_explicit_date(self, raw_text: str) -> date | None:
-        match = re.search(r"(\d{4})-(\d{2})-(\d{2})", raw_text)
-        if not match:
-            return None
-        return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    def _extract_explicit_date_candidates(self, raw_text: str | None) -> list[tuple[int, date]]:
+        if raw_text is None:
+            return []
+
+        candidates: list[tuple[int, date]] = []
+        for match in re.finditer(r"(\d{4})-(\d{2})-(\d{2})", raw_text):
+            try:
+                candidates.append(
+                    (
+                        match.start(),
+                        date(int(match.group(1)), int(match.group(2)), int(match.group(3))),
+                    )
+                )
+            except ValueError:
+                continue
+        return candidates
+
+    def _extract_expiry_candidates(self, raw_text: str) -> list[ExpiryCandidate]:
+        keyword_positions = self._extract_expiry_keyword_positions(raw_text)
+        if not keyword_positions:
+            return []
+
+        candidates: list[tuple[int, date]] = []
+        candidates.extend(self._extract_explicit_date_candidates(raw_text))
+        candidates.extend(self._extract_relative_date_candidates(raw_text))
+        candidates.extend(self._extract_current_year_month_end_candidates(raw_text))
+        candidates.extend(self._extract_current_year_month_day_candidates(raw_text))
+        return [(position, value, self._nearest_keyword_distance(position, keyword_positions)) for position, value in candidates]
+
+    def _extract_expiry_keyword_positions(self, raw_text: str) -> list[int]:
+        positions: list[int] = []
+        for keyword in ("过期", "到期", "截止"):
+            positions.extend(match.start() for match in re.finditer(keyword, raw_text))
+        return positions
+
+    def _nearest_keyword_distance(self, candidate_position: int, keyword_positions: list[int]) -> tuple[int, int, int]:
+        nearest_position = min(keyword_positions, key=lambda position: abs(position - candidate_position))
+        return (
+            abs(candidate_position - nearest_position),
+            0 if candidate_position >= nearest_position else 1,
+            candidate_position,
+        )
+
+    def _select_expiry_candidate(self, candidates: list[ExpiryCandidate]) -> date:
+        return min(candidates, key=lambda candidate: candidate[2])[1]
+
+    def _extract_relative_date_candidates(self, raw_text: str) -> list[tuple[int, date]]:
+        candidates: list[tuple[int, date]] = []
+        relative_offsets = {
+            "今天": 0,
+            "明天": 1,
+            "后天": 2,
+        }
+
+        for keyword, offset in relative_offsets.items():
+            for match in re.finditer(keyword, raw_text):
+                candidates.append((match.start(), date.today() + timedelta(days=offset)))
+
+        for match in re.finditer(r"(\d+)天后", raw_text):
+            candidates.append((match.start(), date.today() + timedelta(days=int(match.group(1)))))
+
+        return candidates
+
+    def _extract_current_year_month_end_candidates(self, raw_text: str) -> list[tuple[int, date]]:
+        candidates: list[tuple[int, date]] = []
+        year = date.today().year
+
+        for match in re.finditer(r"(?:今年)?(\d{1,2})月底", raw_text):
+            month = int(match.group(1))
+            try:
+                last_day = calendar.monthrange(year, month)[1]
+                candidates.append((match.start(), date(year, month, last_day)))
+            except (calendar.IllegalMonthError, ValueError):
+                continue
+
+        return candidates
+
+    def _extract_current_year_month_day_candidates(self, raw_text: str) -> list[tuple[int, date]]:
+        candidates: list[tuple[int, date]] = []
+        year = date.today().year
+
+        for match in re.finditer(r"(?:今年)?(\d{1,2})月(\d{1,2})[日号]?", raw_text):
+            month = int(match.group(1))
+            day = int(match.group(2))
+            try:
+                candidates.append((match.start(), date(year, month, day)))
+            except ValueError:
+                continue
+
+        return candidates
 
     def _extract_location(self, raw_text: str) -> str:
         for keyword in LOCATION_KEYWORDS:

@@ -16,11 +16,16 @@ STAGE_BY_DAYS = {
 
 class ReminderService:
     def __init__(self, notifier: Notifier | None = None):
-        self.notifier = notifier or Notifier()
+        self.notifier = notifier if notifier is not None else Notifier()
 
     def process_due_reminders(self, db: Session, today: date | None = None) -> int:
         current_date = today or date.today()
-        items = db.scalars(select(FoodItem).where(FoodItem.status == "active")).all()
+        items = db.scalars(
+            select(FoodItem).where(
+                FoodItem.status == "active",
+                FoodItem.needs_confirmation.is_(False),
+            )
+        ).all()
         sent_count = 0
 
         for item in items:
@@ -29,9 +34,9 @@ class ReminderService:
             if stage is None or item.last_notified_stage == stage:
                 continue
 
-            self.notifier.send(item=item, stage=stage, days_left=days_left)
-            item.last_notified_stage = stage
-            sent_count += 1
+            if self.notifier.send(item=item, stage=stage, days_left=days_left):
+                item.last_notified_stage = stage
+                sent_count += 1
 
         db.commit()
         return sent_count

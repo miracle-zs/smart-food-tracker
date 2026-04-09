@@ -12,9 +12,12 @@ from app.schemas.item import (
     ItemCreate,
     ItemResponse,
     ItemStatusUpdate,
+    ItemUpdate,
     VoiceItemCreate,
     VoiceItemResponse,
     VoiceParseResult,
+    VoiceWebhookCreate,
+    WebhookIngestionResponse,
 )
 from app.services.voice_parser import VoiceParser
 
@@ -60,6 +63,71 @@ def to_item_response(item: FoodItem) -> ItemResponse:
     )
 
 
+def _normalize_webhook_text(value: object) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, dict):
+        for key in ("text", "raw_text", "query", "content", "message"):
+            normalized = _normalize_webhook_text(value.get(key))
+            if normalized:
+                return normalized
+        return None
+    if isinstance(value, list):
+        for entry in value:
+            if isinstance(entry, (dict, list)):
+                normalized = _normalize_webhook_text(entry)
+                if normalized:
+                    return normalized
+        for entry in value:
+            normalized = _normalize_webhook_text(entry)
+            if normalized:
+                return normalized
+    return None
+
+
+def _extract_webhook_text(payload: VoiceWebhookCreate) -> str:
+    for key in ("text", "raw_text", "query", "content", "message"):
+        normalized = _normalize_webhook_text(getattr(payload, key, None))
+        if normalized:
+            return normalized
+
+    extra = getattr(payload, "model_extra", None) or {}
+    for key in ("text", "raw_text", "query", "content", "message"):
+        if key in extra:
+            normalized = _normalize_webhook_text(extra[key])
+            if normalized:
+                return normalized
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Webhook payload must include text content",
+    )
+
+
+def _persist_voice_item(raw_text: str, db: Session) -> VoiceItemResponse:
+    parsed = voice_parser.parse(raw_text)
+    item = FoodItem(
+        name=parsed.name,
+        location=parsed.location,
+        expiry_date=parsed.expiry_date,
+        status="active",
+        needs_confirmation=parsed.needs_confirmation,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return VoiceItemResponse(
+        parsed_data=VoiceParseResult(
+            name=parsed.name,
+            location=parsed.location,
+            expiry_date=parsed.expiry_date,
+            needs_confirmation=parsed.needs_confirmation,
+        ),
+        item=to_item_response(item),
+    )
+
+
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)) -> ItemResponse:
     item = FoodItem(
@@ -94,26 +162,16 @@ def create_item_from_voice(
     payload: VoiceItemCreate,
     db: Session = Depends(get_db),
 ) -> VoiceItemResponse:
-    parsed = voice_parser.parse(payload.raw_text)
-    item = FoodItem(
-        name=parsed.name,
-        location=parsed.location,
-        expiry_date=parsed.expiry_date,
-        status="active",
-        needs_confirmation=parsed.needs_confirmation,
-    )
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-    return VoiceItemResponse(
-        parsed_data=VoiceParseResult(
-            name=parsed.name,
-            location=parsed.location,
-            expiry_date=parsed.expiry_date,
-            needs_confirmation=parsed.needs_confirmation,
-        ),
-        item=to_item_response(item),
-    )
+    return _persist_voice_item(payload.raw_text, db)
+
+
+@router.post("/voice/webhook", response_model=WebhookIngestionResponse, status_code=status.HTTP_201_CREATED)
+def create_item_from_voice_webhook(
+    payload: VoiceWebhookCreate,
+    db: Session = Depends(get_db),
+) -> WebhookIngestionResponse:
+    result = _persist_voice_item(_extract_webhook_text(payload), db)
+    return WebhookIngestionResponse(ok=True, item_id=result.item.id)
 
 
 @router.put("/{item_id}/status", response_model=ItemResponse)
@@ -126,6 +184,53 @@ def update_item_status(
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     item.status = payload.status
+    db.commit()
+    db.refresh(item)
+    return to_item_response(item)
+
+
+@router.put("/{item_id}", response_model=ItemResponse)
+def update_item(
+    item_id: int,
+    payload: ItemUpdate,
+    db: Session = Depends(get_db),
+) -> FoodItem:
+    item = db.get(FoodItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    if item.status != "active":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active items can be edited")
+    if not item.needs_confirmation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only pending active items can be edited",
+        )
+
+    item.name = payload.name
+    item.location = payload.location
+    item.expiry_date = payload.expiry_date
+    db.commit()
+    db.refresh(item)
+    return to_item_response(item)
+
+
+@router.post("/{item_id}/confirm", response_model=ItemResponse)
+def confirm_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+) -> FoodItem:
+    item = db.get(FoodItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    if item.status != "active":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active items can be confirmed")
+    if not item.needs_confirmation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only pending active items can be confirmed",
+        )
+
+    item.needs_confirmation = False
     db.commit()
     db.refresh(item)
     return to_item_response(item)

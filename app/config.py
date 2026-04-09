@@ -14,7 +14,10 @@ class Settings(BaseModel):
     llm_api_key: str | None = os.getenv("LLM_API_KEY")
     llm_base_url: str | None = os.getenv("LLM_BASE_URL")
     llm_model: str | None = os.getenv("LLM_MODEL")
+    notification_provider: str = os.getenv("NOTIFICATION_PROVIDER", "generic")
     notification_webhook_url: str | None = os.getenv("NOTIFICATION_WEBHOOK_URL")
+    notification_pushplus_token: str | None = os.getenv("NOTIFICATION_PUSHPLUS_TOKEN")
+    notification_serverchan_key: str | None = os.getenv("NOTIFICATION_SERVERCHAN_KEY")
 
 
 settings = Settings()

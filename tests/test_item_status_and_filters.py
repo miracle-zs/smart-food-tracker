@@ -35,3 +35,22 @@ def test_status_updates_and_filters(client):
     assert active_items == []
     assert [item["name"] for item in consumed_items] == ["鲜牛奶"]
     assert [item["status"] for item in freezer_items] == ["discarded"]
+
+
+def test_status_update_rejects_unsupported_values(client):
+    item = client.post(
+        "/api/items",
+        json={
+            "name": "酸奶",
+            "location": "冷藏室",
+            "expiry_date": "2026-04-15",
+        },
+    ).json()
+
+    for unsupported_status in ("active", "archived"):
+        response = client.put(
+            f"/api/items/{item['id']}/status",
+            json={"status": unsupported_status},
+        )
+
+        assert response.status_code == 422
