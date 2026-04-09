@@ -96,3 +96,27 @@ def test_dashboard_script_exposes_v1_loading_and_interaction_hooks(client):
 
     for fragment in expected_fragments:
         assert fragment in script
+
+
+def test_dashboard_stylesheet_exposes_v1_layout_and_responsive_rules(client):
+    response = client.get("/static/styles.css")
+
+    assert response.status_code == 200
+    stylesheet = response.text
+
+    expected_fragments = [
+        ".summary-section",
+        ".summary-metrics",
+        ".risk-board-grid",
+        ".risk-group",
+        ".pending-confirmation-section",
+        ".quick-intake-section",
+        ".inventory-section",
+        ".review-panel-layout",
+        ".filters",
+        "@media (max-width: 1180px)",
+        "@media (max-width: 700px)",
+    ]
+
+    for fragment in expected_fragments:
+        assert fragment in stylesheet
