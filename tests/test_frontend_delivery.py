@@ -16,6 +16,11 @@ def _parse_elements(html):
     return parser.elements
 
 
+def _has_class(attrs, class_name):
+    classes = attrs.get("class", "")
+    return class_name in classes.split()
+
+
 def test_dashboard_shell_serves_forms_and_item_board(client):
     response = client.get("/")
 
@@ -46,6 +51,27 @@ def test_dashboard_shell_serves_forms_and_item_board(client):
         "summary-due-7-days-count",
         "summary-expired-count",
     }.issubset(strong_ids)
+
+    assert any(
+        tag == "section" and _has_class(attrs, "hero-panel") and _has_class(attrs, "top-control-rail")
+        for tag, attrs in elements
+    )
+    assert any(
+        tag == "div" and _has_class(attrs, "summary-metrics") and _has_class(attrs, "instrument-summary-grid")
+        for tag, attrs in elements
+    )
+    assert any(
+        tag == "div" and _has_class(attrs, "risk-board-grid") and _has_class(attrs, "chamber-grid")
+        for tag, attrs in elements
+    )
+    assert any(
+        tag == "section" and attrs.get("id") == "edit-confirm-panel" and _has_class(attrs, "pending-workbench")
+        for tag, attrs in elements
+    )
+    assert any(
+        tag == "div" and _has_class(attrs, "board-header") and _has_class(attrs, "inventory-command-strip")
+        for tag, attrs in elements
+    )
 
     assert any(tag == "form" and attrs.get("id") == "manual-entry-form" for tag, attrs in elements)
     assert any(tag == "form" and attrs.get("id") == "voice-entry-form" for tag, attrs in elements)
