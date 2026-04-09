@@ -2,9 +2,12 @@ const manualForm = document.querySelector("#manual-entry-form");
 const voiceForm = document.querySelector("#voice-entry-form");
 const statusFilter = document.querySelector("#status-filter");
 const locationFilter = document.querySelector("#location-filter");
+const searchInput = document.querySelector("#inventory-search");
+const sortFilter = document.querySelector("#sort-filter");
 const itemsBoard = document.querySelector("#items-board");
 const feedback = document.querySelector("#feedback");
 const reviewPanel = document.querySelector("#edit-confirm-panel");
+const pendingConfirmationList = document.querySelector("#pending-confirmation-list");
 const pendingItemForm = document.querySelector("#pending-item-form");
 const pendingItemIdField = pendingItemForm.querySelector('input[name="item_id"]');
 const pendingItemNameField = document.querySelector("#pending-item-name");
@@ -13,6 +16,15 @@ const pendingItemExpiryField = document.querySelector("#pending-item-expiry-date
 const pendingItemSaveButton = pendingItemForm.querySelector('button[type="submit"]');
 const selectedItemSummary = document.querySelector("#selected-item-summary");
 const confirmPendingButton = document.querySelector("#confirm-pending-item");
+const summaryTotalCount = document.querySelector("#summary-total-count");
+const summaryPendingCount = document.querySelector("#summary-pending-count");
+const summaryDue7DaysCount = document.querySelector("#summary-due-7-days-count");
+const summaryExpiredCount = document.querySelector("#summary-expired-count");
+const expiredBucket = document.querySelector("#expired-items .risk-items");
+const due3Bucket = document.querySelector("#due-3-days-items .risk-items");
+const due7Bucket = document.querySelector("#due-7-days-items .risk-items");
+const safeBucket = document.querySelector("#safe-items .risk-items");
+let inventoryRequestSeq = 0;
 
 const urgencyLabelMap = {
   expired: "已过期",
@@ -21,6 +33,15 @@ const urgencyLabelMap = {
   safe: "安全期",
 };
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function setFeedback(message, isError = false) {
   feedback.textContent = message;
   feedback.classList.toggle("is-error", isError);
@@ -28,10 +49,11 @@ function setFeedback(message, isError = false) {
 
 async function requestJson(url, options = {}) {
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-    },
     ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {}),
+    },
   });
 
   if (!response.ok) {
@@ -41,7 +63,7 @@ async function requestJson(url, options = {}) {
   return response.json();
 }
 
-function buildQuery() {
+function buildInventoryQuery() {
   const params = new URLSearchParams();
   if (statusFilter.value) {
     params.set("status", statusFilter.value);
@@ -49,13 +71,27 @@ function buildQuery() {
   if (locationFilter.value) {
     params.set("location", locationFilter.value);
   }
-  const query = params.toString();
-  return query ? `?${query}` : "";
+  const query = searchInput.value.trim();
+  if (query) {
+    params.set("q", query);
+  }
+  if (sortFilter.value) {
+    params.set("sort", sortFilter.value);
+  }
+  const search = params.toString();
+  return search ? `?${search}` : "";
 }
 
 function renderLocations(items) {
+  if (items.length === 0) {
+    return;
+  }
+
   const currentValue = locationFilter.value;
-  const options = [...new Set(items.map((item) => item.location).filter(Boolean))];
+  const options = [...new Set(items.map((item) => item.location).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "zh-Hans-CN"),
+  );
+
   locationFilter.innerHTML = '<option value="">全部位置</option>';
   options.forEach((location) => {
     const option = document.createElement("option");
@@ -63,11 +99,23 @@ function renderLocations(items) {
     option.textContent = location;
     locationFilter.appendChild(option);
   });
+
   locationFilter.value = options.includes(currentValue) ? currentValue : "";
 }
 
-function createBadge(text, className) {
-  return `<span class="badge ${className}">${text}</span>`;
+function updateSummary(summary) {
+  summaryTotalCount.textContent = String(summary.total_count);
+  summaryPendingCount.textContent = String(summary.pending_confirmation_count);
+  summaryDue7DaysCount.textContent = String(summary.due_within_7_days_count);
+  summaryExpiredCount.textContent = String(summary.expired_count);
+}
+
+function formatDayText(item) {
+  return item.days_left < 0 ? `超期 ${Math.abs(item.days_left)} 天` : `剩余 ${item.days_left} 天`;
+}
+
+function badge(text, className = "") {
+  return `<span class="badge${className ? ` ${className}` : ""}">${escapeHtml(text)}</span>`;
 }
 
 function encodeItemPayload(item) {
@@ -81,64 +129,165 @@ function encodeItemPayload(item) {
   );
 }
 
-function itemCardTemplate(item) {
-  const dayText = item.days_left < 0 ? `超期 ${Math.abs(item.days_left)} 天` : `剩余 ${item.days_left} 天`;
-  const pendingBadge = item.needs_confirmation
-    ? createBadge("待确认", "badge badge-outline")
-    : "";
-  const pendingActions =
-    item.needs_confirmation && item.status === "active"
+function decodeItemPayload(payload) {
+  return JSON.parse(decodeURIComponent(payload));
+}
+
+function renderItemCard(item, { allowStatusActions = true, allowReviewActions = true } = {}) {
+  const statusActions =
+    allowStatusActions && item.status === "active"
+      ? `
+        <button class="action-button" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-status="consumed">
+          已吃完
+        </button>
+        <button class="action-button" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-status="discarded">
+          已丢弃
+        </button>
+      `
+      : "";
+  const reviewActions =
+    allowReviewActions && item.status === "active" && item.needs_confirmation
       ? `
         <button class="action-button" data-action="open-editor" data-item="${encodeItemPayload(item)}">
           编辑
         </button>
-        <button class="action-button" data-action="confirm-item" data-id="${item.id}">
+        <button class="action-button" data-action="confirm-item" data-item="${encodeItemPayload(item)}" data-id="${item.id}" data-name="${escapeHtml(item.name)}">
           确认
         </button>
       `
       : "";
+  const pendingBadge = item.needs_confirmation ? badge("待确认", "badge-outline") : "";
 
   return `
-    <article class="item-card">
+    <article class="item-card" data-item-id="${item.id}">
       <div>
-        <p class="item-title">${item.name}</p>
-        <p class="item-meta">${item.location}</p>
+        <p class="item-title">${escapeHtml(item.name)}</p>
+        <p class="item-meta">${escapeHtml(item.location)}</p>
       </div>
       <div class="item-expiry">
-        <div>${item.expiry_date}</div>
-        <div>${dayText}</div>
+        <div>${escapeHtml(item.expiry_date)}</div>
+        <div>${escapeHtml(formatDayText(item))}</div>
       </div>
       <div class="badge-row">
-        ${createBadge(urgencyLabelMap[item.urgency] || item.urgency, `badge-${item.urgency}`)}
-        ${createBadge(item.status, "badge-outline")}
+        ${badge(urgencyLabelMap[item.urgency] || item.urgency, `badge-${item.urgency}`)}
+        ${badge(item.status, "badge-outline")}
         ${pendingBadge}
       </div>
       <div class="item-actions">
-        ${item.status === "active" ? `<button class="action-button" data-id="${item.id}" data-status="consumed">已吃完</button>` : ""}
-        ${item.status === "active" ? `<button class="action-button" data-id="${item.id}" data-status="discarded">已丢弃</button>` : ""}
-        ${pendingActions}
+        ${statusActions}
+        ${reviewActions}
       </div>
     </article>
   `;
 }
 
-function renderItems(items) {
+function renderInventory(items) {
   if (items.length === 0) {
     itemsBoard.innerHTML = '<div class="empty-state">当前筛选条件下没有条目。</div>';
     return;
   }
-  itemsBoard.innerHTML = items.map(itemCardTemplate).join("");
+
+  itemsBoard.innerHTML = items.map((item) => renderItemCard(item)).join("");
 }
 
-async function loadItems() {
-  try {
-    const items = await requestJson(`/api/items${buildQuery()}`, { method: "GET" });
-    renderLocations(items);
-    renderItems(items);
-    setFeedback(`已加载 ${items.length} 条记录`);
-  } catch (error) {
-    setFeedback("加载条目失败，请检查后端服务。", true);
+function renderRiskBucket(container, items, emptyText) {
+  if (!container) {
+    return;
   }
+
+  if (items.length === 0) {
+    container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+
+  container.innerHTML = items.map((item) => renderItemCard(item)).join("");
+}
+
+function renderRiskBoard(items) {
+  const activeItems = items.filter((item) => item.status === "active");
+  renderRiskBucket(
+    expiredBucket,
+    activeItems.filter((item) => item.urgency === "expired"),
+    "暂无已过期条目。",
+  );
+  renderRiskBucket(
+    due3Bucket,
+    activeItems.filter((item) => item.urgency === "critical"),
+    "暂无 3 天内到期条目。",
+  );
+  renderRiskBucket(
+    due7Bucket,
+    activeItems.filter((item) => item.urgency === "warning"),
+    "暂无 7 天内到期条目。",
+  );
+  renderRiskBucket(
+    safeBucket,
+    activeItems.filter((item) => item.urgency === "safe"),
+    "暂无安全期条目。",
+  );
+}
+
+function renderPendingQueue(items) {
+  const pendingItems = items.filter((item) => item.status === "active" && item.needs_confirmation);
+
+  if (pendingItems.length === 0) {
+    pendingConfirmationList.innerHTML = '<li class="empty-state">暂无待确认条目。</li>';
+    return;
+  }
+
+  pendingConfirmationList.innerHTML = pendingItems
+    .map(
+      (item) => `
+        <li class="pending-queue-item" data-item-id="${item.id}">
+          ${renderItemCard(item, { allowStatusActions: false, allowReviewActions: true })}
+        </li>
+      `,
+    )
+    .join("");
+}
+
+async function loadSummary() {
+  try {
+    const summary = await requestJson("/api/items/summary", { method: "GET" });
+    updateSummary(summary);
+  } catch (error) {
+    setFeedback("概览加载失败，请检查后端服务。", true);
+  }
+}
+
+async function loadActiveDashboardItems() {
+  try {
+    const items = await requestJson("/api/items?status=active&sort=expiry_date_asc", {
+      method: "GET",
+    });
+    renderRiskBoard(items);
+    renderPendingQueue(items);
+  } catch (error) {
+    setFeedback("风险看板加载失败，请稍后重试。", true);
+  }
+}
+
+async function loadInventoryItems() {
+  const requestSeq = ++inventoryRequestSeq;
+  try {
+    const items = await requestJson(`/api/items${buildInventoryQuery()}`, {
+      method: "GET",
+    });
+    if (requestSeq !== inventoryRequestSeq) {
+      return;
+    }
+    renderLocations(items);
+    renderInventory(items);
+  } catch (error) {
+    if (requestSeq !== inventoryRequestSeq) {
+      return;
+    }
+    setFeedback("库存列表加载失败，请稍后重试。", true);
+  }
+}
+
+async function refreshDashboard() {
+  await Promise.all([loadSummary(), loadActiveDashboardItems(), loadInventoryItems()]);
 }
 
 function openReviewPanel(item) {
@@ -167,20 +316,20 @@ function resetReviewPanel() {
   reviewPanel.classList.remove("is-active");
 }
 
-async function confirmItem(itemId) {
-  await requestJson(`/api/items/${itemId}/confirm`, {
+async function confirmItem(item) {
+  await requestJson(`/api/items/${item.id}/confirm`, {
     method: "POST",
   });
   resetReviewPanel();
-  setFeedback("待确认标记已清除");
-  await loadItems();
+  setFeedback(`已确认 ${item.name}，待确认标记已清除。`);
+  await refreshDashboard();
 }
 
 async function handlePendingItemSubmit(event) {
   event.preventDefault();
   const itemId = pendingItemIdField.value;
   if (!itemId) {
-    setFeedback("请先从看板选择一个待确认条目。", true);
+    setFeedback("请先在待确认列表中选择一个条目，再保存修改。", true);
     return;
   }
 
@@ -194,10 +343,10 @@ async function handlePendingItemSubmit(event) {
       body: JSON.stringify(payload),
     });
     resetReviewPanel();
-    setFeedback("条目已更新");
-    await loadItems();
+    setFeedback(`已保存 ${payload.name} 的待确认修改。`);
+    await refreshDashboard();
   } catch (error) {
-    setFeedback("条目更新失败，请稍后重试。", true);
+    setFeedback("保存待确认修改失败，请稍后重试。", true);
   }
 }
 
@@ -212,10 +361,10 @@ async function handleManualSubmit(event) {
       body: JSON.stringify(payload),
     });
     manualForm.reset();
-    setFeedback("手动录入成功");
-    await loadItems();
+    setFeedback(`手动录入成功：${payload.name} 已加入库存。`);
+    await refreshDashboard();
   } catch (error) {
-    setFeedback("手动录入失败，请检查输入格式。", true);
+    setFeedback("手动录入失败，请检查名称、位置和日期后重试。", true);
   }
 }
 
@@ -230,50 +379,51 @@ async function handleVoiceSubmit(event) {
       body: JSON.stringify(payload),
     });
     voiceForm.reset();
-    const confirmationText = response.item.needs_confirmation ? "，已标记待确认" : "";
+    const confirmationText = response.item.needs_confirmation ? "，已进入待确认队列。" : "，已直接入库。";
     setFeedback(`语音录入成功：${response.item.name}${confirmationText}`);
-    await loadItems();
+    await refreshDashboard();
   } catch (error) {
-    setFeedback("语音录入失败，请稍后重试。", true);
+    setFeedback("语音录入失败，请检查转写内容后重试。", true);
   }
 }
 
-async function handleBoardAction(event) {
-  const button = event.target.closest("button[data-id], button[data-action]");
+async function handleDashboardAction(event) {
+  const button = event.target.closest("button");
   if (!button) {
     return;
   }
 
-  try {
-    if (button.dataset.action === "open-editor") {
-      openReviewPanel(JSON.parse(decodeURIComponent(button.dataset.item)));
-      setFeedback("已打开待确认条目的编辑面板");
-      return;
-    }
+  if (button.dataset.action === "open-editor") {
+    openReviewPanel(decodeItemPayload(button.dataset.item));
+    setFeedback("已打开待确认条目的编辑面板。");
+    return;
+  }
 
-    if (button.dataset.action === "confirm-item") {
-      await confirmItem(button.dataset.id);
-      return;
+  if (button.dataset.action === "confirm-item") {
+    try {
+      await confirmItem(decodeItemPayload(button.dataset.item));
+    } catch (error) {
+      setFeedback("确认待确认条目失败，请稍后重试。", true);
     }
+    return;
+  }
 
-    if (button.dataset.status) {
+  if (button.dataset.status) {
+    const itemName = button.dataset.name || "条目";
+    try {
       await requestJson(`/api/items/${button.dataset.id}/status`, {
         method: "PUT",
         body: JSON.stringify({ status: button.dataset.status }),
       });
-      setFeedback("状态已更新");
-      await loadItems();
+      if (pendingItemIdField.value === String(button.dataset.id)) {
+        resetReviewPanel();
+      }
+      const statusText = button.dataset.status === "consumed" ? "已吃完" : "已丢弃";
+      setFeedback(`${itemName} 状态已更新为 ${statusText}。`);
+      await refreshDashboard();
+    } catch (error) {
+      setFeedback("更新条目状态失败，请稍后重试。", true);
     }
-  } catch (error) {
-    if (button.dataset.action === "confirm-item") {
-      setFeedback("确认失败。", true);
-      return;
-    }
-    if (button.dataset.action === "open-editor") {
-      setFeedback("无法打开编辑面板。", true);
-      return;
-    }
-    setFeedback("状态更新失败。", true);
   }
 }
 
@@ -283,18 +433,30 @@ pendingItemForm.addEventListener("submit", handlePendingItemSubmit);
 confirmPendingButton.addEventListener("click", async () => {
   const itemId = pendingItemIdField.value;
   if (!itemId) {
-    setFeedback("请先从看板选择一个待确认条目。", true);
+    setFeedback("请先在待确认列表中选择一个条目，再确认。", true);
     return;
   }
 
+  const item = {
+    id: Number(itemId),
+    name: pendingItemNameField.value || "待确认条目",
+    location: pendingItemLocationField.value,
+    expiry_date: pendingItemExpiryField.value,
+  };
+
   try {
-    await confirmItem(itemId);
+    await confirmItem(item);
   } catch (error) {
-    setFeedback("确认失败。", true);
+    setFeedback("确认待确认条目失败，请稍后重试。", true);
   }
 });
-statusFilter.addEventListener("change", loadItems);
-locationFilter.addEventListener("change", loadItems);
-itemsBoard.addEventListener("click", handleBoardAction);
+statusFilter.addEventListener("change", loadInventoryItems);
+locationFilter.addEventListener("change", loadInventoryItems);
+searchInput.addEventListener("input", loadInventoryItems);
+sortFilter.addEventListener("change", loadInventoryItems);
+itemsBoard.addEventListener("click", handleDashboardAction);
+document.querySelector("#risk-board-section").addEventListener("click", handleDashboardAction);
+pendingConfirmationList.addEventListener("click", handleDashboardAction);
 
-loadItems();
+resetReviewPanel();
+refreshDashboard();

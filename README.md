@@ -1,6 +1,6 @@
 # SmartFood Tracker
 
-家庭食材效期智能管理系统 MVP。
+家庭食材效期智能管理系统 V1。
 
 ## 技术栈
 
@@ -48,12 +48,31 @@ export NOTIFICATION_SERVERCHAN_KEY="your-serverchan-sendkey"
 - `pushplus` 模式下使用 `NOTIFICATION_PUSHPLUS_TOKEN` 发送 Push Plus 消息
 - `serverchan` 模式下使用 `NOTIFICATION_SERVERCHAN_KEY` 发送 Server酱消息
 
+## V1 首页
+
+当前首页已经从 MVP 录入面板升级为家庭库存总控台，包含：
+
+- 今日概览：库存总数、待确认数、7 天内到期数、已过期数
+- 风险看板：按 `已过期` / `3 天内` / `7 天内` / `安全期` 分组展示 `active` 条目
+- 待确认工作区：集中处理语音解析不确定条目
+- 快速录入：手动录入和语音文本录入
+- 完整库存：支持搜索、状态筛选、位置筛选和排序
+
 ## 接口
 
+- `GET /api/items/summary`：返回首页概览统计，包括总数、待确认数、已过期数、7 天内到期数和位置分布
+- `GET /api/items`：返回库存列表，支持筛选、搜索和排序
 - `POST /api/items/voice`：接收语音转写文本，按本地规则或 LLM 解析后创建食材
 - `POST /api/items/voice/webhook`：接收第三方设备或小爱同学风格的 Webhook 文本载荷
 - `PUT /api/items/{id}`：仅允许编辑 `active` 且 `needs_confirmation=true` 的待确认条目
 - `POST /api/items/{id}/confirm`：确认待确认条目并清除 `needs_confirmation`
+
+`GET /api/items` 支持的查询参数：
+
+- `status`：按状态过滤，如 `active` / `consumed` / `discarded`
+- `location`：按存放位置过滤
+- `q`：按食材名称或位置做模糊搜索
+- `sort`：排序方式，支持 `expiry_date_asc` / `expiry_date_desc` / `entry_date_desc`
 
 Webhook 入口支持的常见文本字段包括：
 
@@ -74,11 +93,14 @@ Webhook 入口支持的常见文本字段包括：
 - 手动录入食材
 - 语音文本录入
 - Webhook 文本接入
-- 过期时间升序看板
+- 首页概览统计
+- 风险优先级看板
+- 完整库存搜索、筛选和排序
 - 状态流转：`active` / `consumed` / `discarded`
 - 每日提醒调度
 - 30 / 7 / 3 天提醒节点
 - 待确认条目的编辑与确认
+- 移动端自适应看板
 - 语音解析失败时默认加 30 天并标记待确认
 
 ## 语音与日期解析

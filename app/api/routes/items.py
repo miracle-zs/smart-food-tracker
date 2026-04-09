@@ -1,8 +1,9 @@
 from datetime import date
 from collections.abc import Generator
+from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
@@ -13,6 +14,8 @@ from app.schemas.item import (
     ItemResponse,
     ItemStatusUpdate,
     ItemUpdate,
+    ItemSummaryLocationCount,
+    ItemSummaryResponse,
     VoiceItemCreate,
     VoiceItemResponse,
     VoiceParseResult,
@@ -61,6 +64,10 @@ def to_item_response(item: FoodItem) -> ItemResponse:
         days_left=days_left,
         urgency=urgency,
     )
+
+
+def _escape_like_pattern(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _normalize_webhook_text(value: object) -> str | None:
@@ -146,15 +153,74 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)) -> ItemRespo
 def list_items(
     status: str | None = Query(default=None),
     location: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    sort: str | None = Query(default=None),
     db: Session = Depends(get_db),
-) -> list[FoodItem]:
+) -> list[ItemResponse]:
     statement = select(FoodItem)
     if status:
         statement = statement.where(FoodItem.status == status)
     if location:
         statement = statement.where(FoodItem.location == location)
-    statement = statement.order_by(FoodItem.expiry_date.asc(), FoodItem.id.asc())
+    if q and q.strip():
+        pattern = f"%{_escape_like_pattern(q.strip())}%"
+        statement = statement.where(
+            or_(
+                FoodItem.name.ilike(pattern, escape="\\"),
+                FoodItem.location.ilike(pattern, escape="\\"),
+            )
+        )
+
+    if sort == "expiry_date_desc":
+        statement = statement.order_by(FoodItem.expiry_date.desc(), FoodItem.id.asc())
+    elif sort == "entry_date_desc":
+        statement = statement.order_by(FoodItem.entry_date.desc(), FoodItem.id.asc())
+    else:
+        statement = statement.order_by(FoodItem.expiry_date.asc(), FoodItem.id.asc())
     return [to_item_response(item) for item in db.scalars(statement)]
+
+
+@router.get("/summary", response_model=ItemSummaryResponse)
+def get_item_summary(db: Session = Depends(get_db)) -> ItemSummaryResponse:
+    items = list(db.scalars(select(FoodItem).order_by(FoodItem.id.asc())))
+    today = date.today()
+
+    total_count = len(items)
+    pending_confirmation_count = 0
+    expired_count = 0
+    due_within_3_days_count = 0
+    due_within_7_days_count = 0
+    active_locations: Counter[str] = Counter()
+
+    for item in items:
+        if item.status != "active":
+            continue
+
+        days_left = (item.expiry_date - today).days
+        if item.needs_confirmation:
+            pending_confirmation_count += 1
+        if days_left < 0:
+            expired_count += 1
+        if 0 <= days_left <= 3:
+            due_within_3_days_count += 1
+        if 0 <= days_left <= 7:
+            due_within_7_days_count += 1
+        active_locations[item.location] += 1
+
+    location_counts = [
+        ItemSummaryLocationCount(location=location, count=count)
+        for location, count in sorted(active_locations.items(), key=lambda entry: entry[0])
+    ]
+
+    return ItemSummaryResponse(
+        total_count=total_count,
+        pending_confirmation_count=pending_confirmation_count,
+        expired_count=expired_count,
+        due_within_3_days_count=due_within_3_days_count,
+        due_within_7_days_count=due_within_7_days_count,
+        distinct_location_count=len(active_locations),
+        location_counts=location_counts,
+    )
 
 
 @router.post("/voice", response_model=VoiceItemResponse, status_code=status.HTTP_201_CREATED)

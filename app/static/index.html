@@ -10,83 +10,85 @@
     <main class="app-shell">
       <section class="hero-panel">
         <div class="hero-copy">
-          <p class="eyebrow">Kitchen Intelligence</p>
+          <p class="eyebrow">家庭库存总控台</p>
           <h1>SmartFood Tracker</h1>
           <p class="summary">
-            用一块家庭屏，把冷冻室、冷藏室和零食柜的效期风险集中管理。
+            先看风险，再处理待确认，再补录入。把家庭冰箱和储物柜变成可管理的日常台账。
           </p>
         </div>
         <div class="hero-metrics">
           <article class="metric-card">
-            <span class="metric-label">下一次提醒</span>
-            <strong>每日 10:00</strong>
+            <span class="metric-label">今日关注</span>
+            <strong>快到期 / 待确认</strong>
           </article>
           <article class="metric-card">
-            <span class="metric-label">提醒节点</span>
-            <strong>30 / 7 / 3 天</strong>
+            <span class="metric-label">管理范围</span>
+            <strong>冷藏 / 冷冻 / 常温</strong>
           </article>
         </div>
       </section>
 
-      <section class="control-grid">
-        <article class="panel">
-          <div class="panel-heading">
-            <p class="panel-kicker">Manual Entry</p>
-            <h2>手动录入</h2>
-          </div>
-          <form id="manual-entry-form" class="entry-form">
-            <label>
-              <span>食材名称</span>
-              <input name="name" type="text" placeholder="例如：鲜牛奶" required />
-            </label>
-            <label>
-              <span>存放位置</span>
-              <input name="location" type="text" placeholder="例如：冷藏室" required />
-            </label>
-            <label>
-              <span>过期日期</span>
-              <input name="expiry_date" type="date" required />
-            </label>
-            <button type="submit">添加到看板</button>
-          </form>
-        </article>
-
-        <article class="panel panel-voice">
-          <div class="panel-heading">
-            <p class="panel-kicker">Voice Inbox</p>
-            <h2>语音文本录入</h2>
-          </div>
-          <form id="voice-entry-form" class="entry-form">
-            <label>
-              <span>小爱转写文本</span>
-              <textarea
-                name="raw_text"
-                rows="5"
-                placeholder="例如：今天放了一袋鸡柳在冷冻室，今年10月底过期"
-                required
-              ></textarea>
-            </label>
-            <button type="submit">解析并入库</button>
-          </form>
-          <p class="note">
-            未识别出明确时间时，系统会默认 +30 天，并标记为“待确认”。
-          </p>
-        </article>
+      <section class="summary-section" id="summary-section">
+        <div class="panel-heading">
+          <p class="panel-kicker">Summary</p>
+          <h2>今日概览</h2>
+        </div>
+        <div class="summary-metrics">
+          <article class="metric-card">
+            <span class="metric-label">库存总数</span>
+            <strong id="summary-total-count" data-summary-metric="total">--</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">待确认</span>
+            <strong id="summary-pending-count" data-summary-metric="pending">--</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">7 天内到期</span>
+            <strong id="summary-due-7-days-count" data-summary-metric="due-7-days">--</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">已过期</span>
+            <strong id="summary-expired-count" data-summary-metric="expired">--</strong>
+          </article>
+        </div>
       </section>
 
-      <section class="panel review-panel" id="edit-confirm-panel">
+      <section class="risk-board-section" id="risk-board-section">
         <div class="panel-heading">
-          <p class="panel-kicker">Review Queue</p>
-          <h2>编辑 / 确认</h2>
+          <p class="panel-kicker">Risk Board</p>
+          <h2>风险看板</h2>
+        </div>
+        <div class="risk-board-grid">
+          <article class="panel risk-group" id="expired-items">
+            <h3>已过期</h3>
+            <div class="risk-items"></div>
+          </article>
+          <article class="panel risk-group" id="due-3-days-items">
+            <h3>3 天内</h3>
+            <div class="risk-items"></div>
+          </article>
+          <article class="panel risk-group" id="due-7-days-items">
+            <h3>7 天内</h3>
+            <div class="risk-items"></div>
+          </article>
+          <article class="panel risk-group" id="safe-items">
+            <h3>安全期</h3>
+            <div class="risk-items"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="pending-confirmation-section panel" id="edit-confirm-panel">
+        <div class="panel-heading">
+          <p class="panel-kicker">Pending Confirmation</p>
+          <h2>待确认条目</h2>
         </div>
         <div class="review-panel-layout">
           <div class="review-copy">
             <p id="selected-item-summary" class="review-summary">
-              选择一个待确认条目后，可以在这里修正名称、位置和过期日期。
+              这里收口语音录入和不确定解析的条目，先修正，再确认入库。
             </p>
-            <p class="note">
-              点击看板上的“编辑”打开编辑状态，点击“确认”即可清除待确认标记。
-            </p>
+            <ul class="pending-confirmation-list" id="pending-confirmation-list"></ul>
           </div>
           <form id="pending-item-form" class="entry-form review-form">
             <input name="item_id" type="hidden" />
@@ -119,13 +121,69 @@
         </div>
       </section>
 
-      <section class="board-shell">
+      <section class="quick-intake-section panel" id="quick-intake-section">
+        <div class="panel-heading">
+          <p class="panel-kicker">Quick Intake</p>
+          <h2>快速录入</h2>
+        </div>
+        <div class="control-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <p class="panel-kicker">Manual Entry</p>
+              <h3>手动录入</h3>
+            </div>
+            <form id="manual-entry-form" class="entry-form">
+              <label>
+                <span>食材名称</span>
+                <input name="name" type="text" placeholder="例如：鲜牛奶" required />
+              </label>
+              <label>
+                <span>存放位置</span>
+                <input name="location" type="text" placeholder="例如：冷藏室" required />
+              </label>
+              <label>
+                <span>过期日期</span>
+                <input name="expiry_date" type="date" required />
+              </label>
+              <button type="submit">添加到看板</button>
+            </form>
+          </article>
+
+          <article class="panel panel-voice">
+            <div class="panel-heading">
+              <p class="panel-kicker">Voice Inbox</p>
+              <h3>语音文本录入</h3>
+            </div>
+            <form id="voice-entry-form" class="entry-form">
+              <label>
+                <span>小爱转写文本</span>
+                <textarea
+                  name="raw_text"
+                  rows="5"
+                  placeholder="例如：今天放了一袋鸡柳在冷冻室，今年10月底过期"
+                  required
+                ></textarea>
+              </label>
+              <button type="submit">解析并入库</button>
+            </form>
+            <p class="note">
+              未识别出明确时间时，系统会默认 +30 天，并标记为“待确认”。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="inventory-section board-shell" id="inventory-section">
         <div class="board-header">
           <div>
-            <p class="panel-kicker">Expiry Board</p>
-            <h2>全局效期看板</h2>
+            <p class="panel-kicker">Full Inventory</p>
+            <h2>完整库存</h2>
           </div>
           <div class="filters">
+            <label>
+              <span>搜索</span>
+              <input id="inventory-search" type="search" placeholder="搜索食材或位置" />
+            </label>
             <label>
               <span>状态</span>
               <select id="status-filter">
@@ -139,6 +197,14 @@
               <span>位置</span>
               <select id="location-filter">
                 <option value="">全部位置</option>
+              </select>
+            </label>
+            <label>
+              <span>排序</span>
+              <select id="sort-filter">
+                <option value="expiry_date_asc">到期日升序</option>
+                <option value="expiry_date_desc">到期日降序</option>
+                <option value="entry_date_desc">录入时间降序</option>
               </select>
             </label>
           </div>

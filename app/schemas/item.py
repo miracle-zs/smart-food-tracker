@@ -43,6 +43,24 @@ class ItemResponse(BaseModel):
     urgency: str
 
 
+class ItemSummaryLocationCount(BaseModel):
+    location: str
+    count: int
+
+
+class ItemSummaryResponse(BaseModel):
+    total_count: int
+    pending_confirmation_count: int
+    expired_count: int
+    due_within_3_days_count: int
+    due_within_7_days_count: int
+    distinct_location_count: int
+    location_counts: list[ItemSummaryLocationCount]
+
+
+ItemListSort = Literal["expiry_date_asc", "expiry_date_desc", "entry_date_desc"]
+
+
 class ItemStatusUpdate(BaseModel):
     status: Literal["consumed", "discarded"]
 
