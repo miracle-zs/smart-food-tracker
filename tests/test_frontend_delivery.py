@@ -131,6 +131,11 @@ def test_dashboard_stylesheet_exposes_v1_layout_and_responsive_rules(client):
     stylesheet = response.text
 
     expected_fragments = [
+        ".top-control-rail",
+        ".instrument-summary-grid",
+        ".chamber-grid",
+        ".pending-workbench",
+        ".inventory-command-strip",
         ".summary-section",
         ".summary-metrics",
         ".risk-board-grid",
@@ -148,6 +153,7 @@ def test_dashboard_stylesheet_exposes_v1_layout_and_responsive_rules(client):
         assert fragment in stylesheet
 
     assert ".item-card > :last-child" not in stylesheet
-    assert ".risk-group {\n  --group-accent: var(--accent);\n  display: grid;\n  position: relative;" in stylesheet
+    assert ".risk-group {\n  --group-accent: var(--accent);" in stylesheet
+    assert ".risk-group::before" in stylesheet
     assert "@media (max-width: 900px)" in stylesheet
     assert ".item-actions {\n    grid-column: 1 / -1;" in stylesheet
