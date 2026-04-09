@@ -65,3 +65,25 @@ def test_dashboard_script_resets_review_panel_after_save_and_confirm(client):
     assert "pendingItemNameField.disabled = true;" in script
     assert "confirmPendingButton.disabled = true;" in script
     assert "resetReviewPanel();" in script
+
+
+def test_dashboard_script_exposes_v1_loading_and_interaction_hooks(client):
+    response = client.get("/static/app.js")
+
+    assert response.status_code == 200
+    script = response.text
+
+    expected_fragments = [
+        'requestJson("/api/items/summary"',
+        'document.querySelector("#summary-total-count")',
+        'document.querySelector("#inventory-search")',
+        'document.querySelector("#sort-filter")',
+        'document.querySelector("#expired-items .risk-items")',
+        'document.querySelector("#due-3-days-items .risk-items")',
+        'document.querySelector("#due-7-days-items .risk-items")',
+        'document.querySelector("#safe-items .risk-items")',
+        'document.querySelector("#pending-confirmation-list")',
+    ]
+
+    for fragment in expected_fragments:
+        assert fragment in script
