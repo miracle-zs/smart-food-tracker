@@ -82,7 +82,12 @@ def test_dashboard_script_exposes_v1_loading_and_interaction_hooks(client):
         'document.querySelector("#due-3-days-items .risk-items")',
         'document.querySelector("#due-7-days-items .risk-items")',
         'document.querySelector("#safe-items .risk-items")',
+        'document.querySelector("#pending-item-form")',
+        'document.querySelector("#confirm-pending-item")',
         'document.querySelector("#pending-confirmation-list")',
+        'button.dataset.action === "open-editor"',
+        'openReviewPanel(decodeItemPayload(button.dataset.item))',
+        'pendingConfirmationList.addEventListener("click", handleDashboardAction)',
     ]
 
     for fragment in expected_fragments:
